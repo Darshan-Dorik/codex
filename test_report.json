@@ -1,60 +1,63 @@
 {
   "summary": {
-    "total": 4,
-    "passed": 3,
-    "failed": 1
+    "total": 2,
+    "passed": 2,
+    "failed": 0
   },
   "scenarios": [
     {
-      "scenario": "Motor Start with TON Delay (0.5s)",
+      "scenario": "Good Logic (no violations)",
       "status": "pass",
       "errors": [],
-      "snapshots": []
+      "snapshots": [],
+      "violations": []
     },
     {
-      "scenario": "Shuttle Position Sensor Trigger",
+      "scenario": "Bad Logic (violations expected)",
       "status": "pass",
       "errors": [],
-      "snapshots": []
-    },
-    {
-      "scenario": "Jam Detection Stops Motor",
-      "status": "pass",
-      "errors": [],
-      "snapshots": []
-    },
-    {
-      "scenario": "Intentional Failure (for report demo)",
-      "status": "fail",
-      "errors": [
-        "At 300ms: expected Y0=True, got False",
-        "At 900ms: no data captured (simulation may not have reached this time)"
-      ],
-      "snapshots": [
+      "snapshots": [],
+      "violations": [
         {
-          "timestamp_ms": 300,
-          "reason": "At 300ms: expected Y0=True, got False",
-          "inputs": {
-            "X0": false
-          },
-          "outputs": {
-            "Y0": false
-          },
-          "loom_state": {
-            "motor_running": false,
-            "shuttle_position": 0.0,
-            "jam_detected": false
+          "time": 300,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 300,
+            "inputs": {
+              "X0": true,
+              "X1": true
+            },
+            "outputs": {
+              "Y0": true
+            }
           }
         },
         {
-          "timestamp_ms": 900,
-          "reason": "no data captured",
-          "inputs": {},
-          "outputs": {},
-          "loom_state": {
-            "motor_running": false,
-            "shuttle_position": 0.0,
-            "jam_detected": false
+          "time": 400,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 400,
+            "inputs": {
+              "X0": true,
+              "X1": true
+            },
+            "outputs": {
+              "Y0": true
+            }
+          }
+        },
+        {
+          "time": 500,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 500,
+            "inputs": {
+              "X0": true,
+              "X1": true
+            },
+            "outputs": {
+              "Y0": true
+            }
           }
         }
       ]

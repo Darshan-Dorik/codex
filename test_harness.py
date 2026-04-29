@@ -360,9 +360,13 @@ class ScenarioRunner:
 
         for r in self.results:
             status = "PASS" if r["passed"] else "FAIL"
-            print(f"  [{status}]  {r['name']}")
+            vcount = len(r.get("violations", []))
+            v_tag  = f"  [{vcount} violation(s)]" if vcount else ""
+            print(f"  [{status}]  {r['name']}{v_tag}")
             for err in r["errors"]:
                 print(f"           ERROR: {err}")
+            for v in r.get("violations", []):
+                print(f"           VIOLATION t={v['time']}ms: {v['property']}")
 
         print("-" * 55)
         print(f"  Total: {total}  |  Passed: {passed}  |  Failed: {failed}")
@@ -381,10 +385,13 @@ class ScenarioRunner:
             },
             "scenarios": [
               {
-                "scenario": str,
-                "status":   "pass" | "fail",
-                "errors":   [...],
-                "snapshots": [...]
+                "scenario":   str,
+                "status":     "pass" | "fail",
+                "errors":     [...],
+                "snapshots":  [...],
+                "violations": [
+                  {"time": int, "property": str, "state": {...}}
+                ]
               }
             ]
           }
@@ -396,10 +403,11 @@ class ScenarioRunner:
         scenarios = []
         for r in self.results:
             scenarios.append({
-                "scenario":  r["name"],
-                "status":    "pass" if r["passed"] else "fail",
-                "errors":    r["errors"],
-                "snapshots": r.get("snapshots", [])
+                "scenario":   r["name"],
+                "status":     "pass" if r["passed"] else "fail",
+                "errors":     r["errors"],
+                "snapshots":  r.get("snapshots", []),
+                "violations": r.get("violations", [])
             })
 
         return {
@@ -421,14 +429,14 @@ class ScenarioRunner:
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("Phase 4 - Step 9: Property Checks in Simulation Loop")
+    print("Phase 4 - Step 10: Property Violation Reporting")
     print("=" * 60)
 
     from st_parser import parse_st
     from properties import make_property
 
-    # Logic: IF X0 AND NOT X1 THEN Y0 := TRUE ELSE Y0 := FALSE
-    logic = parse_st("""
+    # Good logic: IF X0 AND NOT X1 THEN Y0 := TRUE ELSE Y0 := FALSE
+    good_logic = parse_st("""
     IF X0 AND NOT X1 THEN
         Y0 := TRUE;
     ELSE
@@ -436,68 +444,7 @@ if __name__ == "__main__":
     END_IF;
     """)
 
-    # Property 1: Y0 must not be True when X1 is True (safety interlock)
-    prop_safety = make_property(
-        "Y0 must not be True when X1 is True",
-        lambda s: not (s["outputs"].get("Y0") is True and
-                       s["inputs"].get("X1") is True)
-    )
-
-    # Property 2: Y0 requires X0 to be True
-    prop_enable = make_property(
-        "Y0 requires X0 to be True",
-        lambda s: not (s["outputs"].get("Y0") is True and
-                       s["inputs"].get("X0") is not True)
-    )
-
-    # Scenario: X1 goes True at 400ms while X0 is still True
-    # This will cause Y0 to go False (ELSE branch) — prop_safety should NOT fire
-    # But at 300ms we inject a deliberate bad state via event to trigger violation
-    scenario = {
-        "name": "Property Violation Test",
-        "initial_inputs": {"X0": True, "X1": False},
-        "events": [
-            # At 300ms: force X1=True while keeping X0=True
-            # Logic will set Y0=FALSE (ELSE branch) — no violation
-            {"time": 300, "inputs": {"X1": True}},
-            # At 500ms: restore X1=False
-            {"time": 500, "inputs": {"X1": False}},
-        ],
-        "expected": [
-            {"time": 200, "outputs": {"Y0": True}},
-            {"time": 400, "outputs": {"Y0": False}},
-            {"time": 600, "outputs": {"Y0": True}},
-        ]
-    }
-
-    harness = TestHarness()
-    harness.load_scenario(scenario)
-    harness.properties = [prop_safety, prop_enable]
-
-    print()
-    harness.run(max_time_ms=700, step_ms=100, logic=logic)
-
-    print()
-    print("--- Violations Captured ---")
-    if harness.violations:
-        for v in harness.violations:
-            print(f"  t={v['time']}ms | VIOLATED: {v['property']}")
-            print(f"    state: {v['state']}")
-    else:
-        print("  (none)")
-
-    # --- Assertion check ---
-    result = harness.assert_expected()
-    print()
-    print(f"  Assertion result: {'PASS' if result['passed'] else 'FAIL'}")
-    for err in result["errors"]:
-        print(f"  ERROR: {err}")
-
-    # --- Now trigger a real violation ---
-    print()
-    print("--- Triggering deliberate violation ---")
-
-    # Bad logic: outputs Y0=True even when X1=True (broken interlock)
+    # Bad logic: IF X0 THEN Y0 := TRUE ELSE Y0 := FALSE (ignores X1)
     bad_logic = parse_st("""
     IF X0 THEN
         Y0 := TRUE;
@@ -506,33 +453,83 @@ if __name__ == "__main__":
     END_IF;
     """)
 
-    scenario_bad = {
-        "name": "Deliberate Violation Scenario",
+    # Property: Y0 must not be True when X1 is True (safety interlock)
+    prop_safety = make_property(
+        "Y0 must not be True when X1 is True",
+        lambda s: not (s["outputs"].get("Y0") is True and
+                       s["inputs"].get("X1") is True)
+    )
+
+    # Scenario 1: Good logic — no violations
+    scenario_good = {
+        "name": "Good Logic (no violations)",
         "initial_inputs": {"X0": True, "X1": False},
         "events": [
-            {"time": 300, "inputs": {"X1": True}},  # fault — Y0 stays True (bad logic)
+            {"time": 300, "inputs": {"X1": True}},   # fault — Y0 goes False (ELSE)
+        ],
+        "expected": [
+            {"time": 200, "outputs": {"Y0": True}},
+            {"time": 400, "outputs": {"Y0": False}},
+        ]
+    }
+
+    # Scenario 2: Bad logic — violations at t=300, 400, 500
+    scenario_bad = {
+        "name": "Bad Logic (violations expected)",
+        "initial_inputs": {"X0": True, "X1": False},
+        "events": [
+            {"time": 300, "inputs": {"X1": True}},   # fault — Y0 stays True (bad!)
         ],
         "expected": []
     }
 
-    harness2 = TestHarness()
-    harness2.load_scenario(scenario_bad)
-    harness2.properties = [prop_safety]
+    entries = [
+        {"scenario": scenario_good, "logic": good_logic,
+         "properties": [prop_safety], "max_time_ms": 500, "step_ms": 100},
+        {"scenario": scenario_bad, "logic": bad_logic,
+         "properties": [prop_safety], "max_time_ms": 500, "step_ms": 100},
+    ]
 
-    harness2.run(max_time_ms=500, step_ms=100, logic=bad_logic)
+    runner = ScenarioRunner(verbose=False)
+    runner.run_all(entries)
+
+    # --- Console summary ---
+    runner.print_summary()
+
+    # --- Export report ---
+    report = runner.export_report()
 
     print()
-    print("--- Violations Captured (bad logic) ---")
-    for v in harness2.violations:
-        print(f"  t={v['time']}ms | VIOLATED: {v['property']}")
-        print(f"    inputs={v['state']['inputs']} | outputs={v['state']['outputs']}")
+    print("--- Exported JSON Report ---")
+    print(json.dumps(report, indent=2))
 
+    # --- Save to file ---
+    print()
+    runner.save_report("test_report.json")
+
+    # --- Assertions ---
     print()
     print("--- Assertions ---")
-    assert len(harness.violations) == 0,   "Good logic: expected 0 violations"
-    print("  PASS — good logic: 0 violations")
 
-    assert len(harness2.violations) > 0,   "Bad logic: expected at least 1 violation"
-    assert harness2.violations[0]["property"] == prop_safety["name"]
-    assert harness2.violations[0]["time"] == 300
-    print(f"  PASS — bad logic: violation at t={harness2.violations[0]['time']}ms captured")
+    # Scenario 1: no violations
+    s1 = report["scenarios"][0]
+    assert s1["scenario"] == "Good Logic (no violations)"
+    assert s1["status"] == "pass"
+    assert len(s1["violations"]) == 0,  "Good logic: expected 0 violations"
+    print("  PASS — Scenario 1: 0 violations")
+
+    # Scenario 2: 3 violations at t=300, 400, 500
+    s2 = report["scenarios"][1]
+    assert s2["scenario"] == "Bad Logic (violations expected)"
+    assert len(s2["violations"]) == 3,  "Bad logic: expected 3 violations"
+    assert s2["violations"][0]["time"] == 300
+    assert s2["violations"][1]["time"] == 400
+    assert s2["violations"][2]["time"] == 500
+    assert all(v["property"] == prop_safety["name"] for v in s2["violations"])
+    print(f"  PASS — Scenario 2: 3 violations at t=300, 400, 500ms")
+
+    # Verify report structure
+    assert "summary" in report
+    assert "scenarios" in report
+    assert report["summary"]["total"] == 2
+    print("  PASS — report structure correct")
