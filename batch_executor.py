@@ -31,12 +31,13 @@ def execute_scenarios(scenarios, logic, max_time_ms=1000, step_ms=100,
         list of result dicts:
         [
           {
-            "scenario":   str,          # scenario name
+            "scenario":   str,
             "status":     "pass"|"fail"|"error",
-            "errors":     [...],        # assertion failures
-            "violations": [...],        # property violations
-            "timeline":   [...],        # full output timeline
-            "error_msg":  str | None
+            "errors":     [...],
+            "violations": [...],
+            "timeline":   [...],
+            "error_msg":  str | None,
+            "coverage":   {...}   # plc.get_coverage_report() for this scenario
           }
         ]
     """
@@ -49,6 +50,7 @@ def execute_scenarios(scenarios, logic, max_time_ms=1000, step_ms=100,
             "errors":    [],
             "violations": [],
             "timeline":  [],
+            "coverage":  {},
             "error_msg": None
         }
 
@@ -70,6 +72,8 @@ def execute_scenarios(scenarios, logic, max_time_ms=1000, step_ms=100,
             result["violations"] = harness.violations
             result["timeline"]   = harness.output_timeline
             result["status"]     = "pass" if assertion["passed"] else "fail"
+            # Capture per-scenario coverage from the PLC instance
+            result["coverage"]   = harness.plc.get_coverage_report()
 
         except Exception as e:
             sys.stdout = sys.__stdout__   # safety restore
