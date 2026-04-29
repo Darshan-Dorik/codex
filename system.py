@@ -130,5 +130,42 @@ def test_step9():
     print("\n--- Structured Logs ---")
     logger.print_logs()
 
+def test_phase2_step8():
+    from st_parser import parse_st
+    from clock import SimulationClock
+    
+    print("\nPhase 2 - Step 8: Execute Parsed ST")
+    
+    st_code = """
+    IF X0 THEN
+        Y0 := TRUE;
+    END_IF;
+    """
+    
+    print("1. Raw ST Code:")
+    print(st_code.strip())
+    
+    plc = PLC()
+    clock = SimulationClock()
+    
+    # 2. Parse ST to DSL
+    parsed_logic = parse_st(st_code)
+    plc.logic = parsed_logic
+    print(f"\n2. Parsed Logic Assigned to PLC: {plc.logic}")
+    
+    # 3. Execute in PLC
+    print("\n3. Executing in PLC Engine")
+    
+    # Test True
+    plc.inputs["X0"] = True
+    plc.scan(clock.get_time())
+    print(f"  Input X0={plc.inputs['X0']} -> Output Y0={plc.outputs.get('Y0')} (Expected: True)")
+    
+    # Test False
+    clock.advance(100)
+    plc.inputs["X0"] = False
+    plc.scan(clock.get_time())
+    print(f"  Input X0={plc.inputs['X0']} -> Output Y0={plc.outputs.get('Y0')} (Expected: False)")
+
 if __name__ == "__main__":
-    test_step9()
+    test_phase2_step8()
