@@ -2,6 +2,7 @@ import json
 from plc import PLC
 from loom import LoomState
 from clock import SimulationClock
+from properties import validate_properties
 
 class TestHarness:
     def __init__(self):
@@ -10,10 +11,13 @@ class TestHarness:
         self.clock = None
         self.scenario = None
         self.output_timeline = []
+        self.properties = []    # list of property dicts to check each tick
+        self.violations  = []   # list of violation dicts recorded during run
 
     def load_scenario(self, scenario):
         self.scenario = scenario
         self.output_timeline = []
+        self.violations = []    # reset violations on each load
 
     def run(self, max_time_ms=1000, step_ms=100, logic=None, wiring=None):
         """
@@ -71,8 +75,24 @@ class TestHarness:
                 "inputs": dict(self.plc.inputs),
                 "outputs": dict(self.plc.outputs)
             })
-            
-            # 6. Update Loom physics
+
+            # 6. Evaluate properties against current state
+            if self.properties:
+                state = {
+                    "time":    current_time,
+                    "inputs":  dict(self.plc.inputs),
+                    "outputs": dict(self.plc.outputs)
+                }
+                tick_violations = validate_properties(self.properties, state)
+                for v in tick_violations:
+                    self.violations.append({
+                        "time":     current_time,
+                        "property": v["property"],
+                        "state":    v["state"]
+                    })
+                    print(f"  [VIOLATION] t={current_time}ms: {v['property']}")
+
+            # 7. Update Loom physics
             self.loom.update(current_time)
             
             print(f"Time: {current_time}ms | Inputs: {self.plc.inputs} | Outputs: {self.plc.outputs} | ShuttlePos: {round(self.loom.shuttle_position, 2)}")
@@ -300,9 +320,11 @@ class ScenarioRunner:
             max_time   = entry.get("max_time_ms", 1000)
             step       = entry.get("step_ms", 100)
             wiring     = entry.get("wiring", None)
+            properties = entry.get("properties", [])
 
             harness = TestHarness()
             harness.load_scenario(scenario)
+            harness.properties = properties
 
             if not self.verbose:
                 import io, sys
@@ -317,10 +339,11 @@ class ScenarioRunner:
             assertion = harness.assert_expected()
 
             self.results.append({
-                "name":      scenario["name"],
-                "passed":    assertion["passed"],
-                "errors":    assertion["errors"],
-                "snapshots": assertion["snapshots"]
+                "name":       scenario["name"],
+                "passed":     assertion["passed"],
+                "errors":     assertion["errors"],
+                "snapshots":  assertion["snapshots"],
+                "violations": harness.violations
             })
 
         return self.results
@@ -398,97 +421,118 @@ class ScenarioRunner:
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("Phase 3 - Step 10: Export Test Report")
+    print("Phase 4 - Step 9: Property Checks in Simulation Loop")
     print("=" * 60)
 
     from st_parser import parse_st
+    from properties import make_property
 
-    # --- Logic definitions ---
-    logic_ton = [
-        {"type": "ton", "id": "T0", "if": "X0", "pt": 0.5, "set": "Y0"}
-    ]
-    logic_assign = parse_st("""
-    IF X0 THEN
+    # Logic: IF X0 AND NOT X1 THEN Y0 := TRUE ELSE Y0 := FALSE
+    logic = parse_st("""
+    IF X0 AND NOT X1 THEN
         Y0 := TRUE;
+    ELSE
+        Y0 := FALSE;
     END_IF;
     """)
-    logic_interlock = [
-        {"type": "interlock", "run": "X0", "stop": "X2", "set": "Y0"}
-    ]
 
-    # --- Wiring callbacks ---
-    def wiring_shuttle(plc, loom, t):
-        plc.inputs["X1"] = loom.shuttle_position > 15.0
+    # Property 1: Y0 must not be True when X1 is True (safety interlock)
+    prop_safety = make_property(
+        "Y0 must not be True when X1 is True",
+        lambda s: not (s["outputs"].get("Y0") is True and
+                       s["inputs"].get("X1") is True)
+    )
 
-    def wiring_jam(plc, loom, t):
-        if t >= 400:
-            loom.jam_detected = True
-        plc.inputs["X2"] = loom.jam_detected
+    # Property 2: Y0 requires X0 to be True
+    prop_enable = make_property(
+        "Y0 requires X0 to be True",
+        lambda s: not (s["outputs"].get("Y0") is True and
+                       s["inputs"].get("X0") is not True)
+    )
 
-    # --- Scenarios ---
-    scenario_1 = {
-        "name": "Motor Start with TON Delay (0.5s)",
-        "initial_inputs": {"X0": False},
-        "events": [{"time": 200, "inputs": {"X0": True}}],
+    # Scenario: X1 goes True at 400ms while X0 is still True
+    # This will cause Y0 to go False (ELSE branch) — prop_safety should NOT fire
+    # But at 300ms we inject a deliberate bad state via event to trigger violation
+    scenario = {
+        "name": "Property Violation Test",
+        "initial_inputs": {"X0": True, "X1": False},
+        "events": [
+            # At 300ms: force X1=True while keeping X0=True
+            # Logic will set Y0=FALSE (ELSE branch) — no violation
+            {"time": 300, "inputs": {"X1": True}},
+            # At 500ms: restore X1=False
+            {"time": 500, "inputs": {"X1": False}},
+        ],
         "expected": [
+            {"time": 200, "outputs": {"Y0": True}},
             {"time": 400, "outputs": {"Y0": False}},
-            {"time": 700, "outputs": {"Y0": True}},
-            {"time": 900, "outputs": {"Y0": True}}
-        ]
-    }
-    scenario_2 = {
-        "name": "Shuttle Position Sensor Trigger",
-        "initial_inputs": {"X0": True},
-        "events": [],
-        "expected": [
-            {"time": 1000, "outputs": {"Y0": True}},
-            {"time": 2000, "outputs": {"Y0": True}}
-        ]
-    }
-    scenario_3 = {
-        "name": "Jam Detection Stops Motor",
-        "initial_inputs": {"X0": True, "X2": False},
-        "events": [],
-        "expected": [
-            {"time": 300, "outputs": {"Y0": True}},
-            {"time": 500, "outputs": {"Y0": False}},
-            {"time": 700, "outputs": {"Y0": False}}
-        ]
-    }
-    # Deliberately failing scenario to show error reporting in report
-    scenario_4 = {
-        "name": "Intentional Failure (for report demo)",
-        "initial_inputs": {"X0": False},
-        "events": [],
-        "expected": [
-            {"time": 300, "outputs": {"Y0": True}},   # wrong: Y0 is False
-            {"time": 900, "outputs": {"Y0": True}}    # out of range
+            {"time": 600, "outputs": {"Y0": True}},
         ]
     }
 
-    entries = [
-        {"scenario": scenario_1, "logic": logic_ton,
-         "max_time_ms": 1000, "step_ms": 100},
-        {"scenario": scenario_2, "logic": logic_assign,
-         "wiring": wiring_shuttle, "max_time_ms": 2100, "step_ms": 100},
-        {"scenario": scenario_3, "logic": logic_interlock,
-         "wiring": wiring_jam, "max_time_ms": 800, "step_ms": 100},
-        {"scenario": scenario_4, "logic": logic_ton,
-         "max_time_ms": 700, "step_ms": 100},
-    ]
+    harness = TestHarness()
+    harness.load_scenario(scenario)
+    harness.properties = [prop_safety, prop_enable]
 
-    runner = ScenarioRunner(verbose=False)
-    runner.run_all(entries)
-
-    # --- Console summary ---
-    runner.print_summary()
-
-    # --- Export and print JSON report ---
-    report = runner.export_report()
     print()
-    print("--- Exported JSON Report ---")
-    print(json.dumps(report, indent=2))
+    harness.run(max_time_ms=700, step_ms=100, logic=logic)
 
-    # --- Save to file ---
     print()
-    runner.save_report("test_report.json")
+    print("--- Violations Captured ---")
+    if harness.violations:
+        for v in harness.violations:
+            print(f"  t={v['time']}ms | VIOLATED: {v['property']}")
+            print(f"    state: {v['state']}")
+    else:
+        print("  (none)")
+
+    # --- Assertion check ---
+    result = harness.assert_expected()
+    print()
+    print(f"  Assertion result: {'PASS' if result['passed'] else 'FAIL'}")
+    for err in result["errors"]:
+        print(f"  ERROR: {err}")
+
+    # --- Now trigger a real violation ---
+    print()
+    print("--- Triggering deliberate violation ---")
+
+    # Bad logic: outputs Y0=True even when X1=True (broken interlock)
+    bad_logic = parse_st("""
+    IF X0 THEN
+        Y0 := TRUE;
+    ELSE
+        Y0 := FALSE;
+    END_IF;
+    """)
+
+    scenario_bad = {
+        "name": "Deliberate Violation Scenario",
+        "initial_inputs": {"X0": True, "X1": False},
+        "events": [
+            {"time": 300, "inputs": {"X1": True}},  # fault — Y0 stays True (bad logic)
+        ],
+        "expected": []
+    }
+
+    harness2 = TestHarness()
+    harness2.load_scenario(scenario_bad)
+    harness2.properties = [prop_safety]
+
+    harness2.run(max_time_ms=500, step_ms=100, logic=bad_logic)
+
+    print()
+    print("--- Violations Captured (bad logic) ---")
+    for v in harness2.violations:
+        print(f"  t={v['time']}ms | VIOLATED: {v['property']}")
+        print(f"    inputs={v['state']['inputs']} | outputs={v['state']['outputs']}")
+
+    print()
+    print("--- Assertions ---")
+    assert len(harness.violations) == 0,   "Good logic: expected 0 violations"
+    print("  PASS — good logic: 0 violations")
+
+    assert len(harness2.violations) > 0,   "Bad logic: expected at least 1 violation"
+    assert harness2.violations[0]["property"] == prop_safety["name"]
+    assert harness2.violations[0]["time"] == 300
+    print(f"  PASS — bad logic: violation at t={harness2.violations[0]['time']}ms captured")
