@@ -1,0 +1,191 @@
+{
+  "program": "programs/motor_start.st",
+  "io_map": {
+    "X0": {
+      "name": "Start Button",
+      "type": "input",
+      "unit": "bool",
+      "description": "Operator start command"
+    },
+    "X1": {
+      "name": "Fault Sensor",
+      "type": "input",
+      "unit": "bool",
+      "description": "General fault / emergency stop input"
+    },
+    "X2": {
+      "name": "Jam Sensor",
+      "type": "input",
+      "unit": "bool",
+      "description": "Shuttle jam detection sensor"
+    },
+    "X3": {
+      "name": "Position Sensor",
+      "type": "input",
+      "unit": "bool",
+      "description": "Shuttle position threshold sensor"
+    },
+    "Y0": {
+      "name": "Main Motor",
+      "type": "output",
+      "unit": "bool",
+      "description": "Main drive motor enable"
+    },
+    "Y1": {
+      "name": "Position Indicator",
+      "type": "output",
+      "unit": "bool",
+      "description": "Position reached indicator lamp"
+    },
+    "Y2": {
+      "name": "Fault Lamp",
+      "type": "output",
+      "unit": "bool",
+      "description": "Fault indicator lamp"
+    }
+  },
+  "sim_trace": [
+    {
+      "time": 100,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 200,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 300,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 400,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 500,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 600,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 700,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    }
+  ],
+  "real_trace": [
+    {
+      "time": 100,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 200,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 300,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 400,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 500,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 600,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 700,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    }
+  ],
+  "diff": [],
+  "summary": {
+    "total_mismatches": 0,
+    "total_compared": 21,
+    "mismatch_rate": 0.0,
+    "signals": {},
+    "first_mismatch_time": null,
+    "last_mismatch_time": null
+  },
+  "readable_report": {
+    "messages": [],
+    "summary": "All signals matched \u2014 simulation and real machine agree.",
+    "has_mismatches": false
+  }
+}

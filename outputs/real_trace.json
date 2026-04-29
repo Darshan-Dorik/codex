@@ -1,0 +1,58 @@
+[
+  {
+    "time": 100,
+    "signals": {
+      "X0": false,
+      "X1": false,
+      "Y0": false
+    }
+  },
+  {
+    "time": 200,
+    "signals": {
+      "X0": false,
+      "X1": false,
+      "Y0": false
+    }
+  },
+  {
+    "time": 300,
+    "signals": {
+      "X0": false,
+      "X1": false,
+      "Y0": false
+    }
+  },
+  {
+    "time": 400,
+    "signals": {
+      "X0": false,
+      "X1": false,
+      "Y0": false
+    }
+  },
+  {
+    "time": 500,
+    "signals": {
+      "X0": false,
+      "X1": false,
+      "Y0": false
+    }
+  },
+  {
+    "time": 600,
+    "signals": {
+      "X0": false,
+      "X1": false,
+      "Y0": false
+    }
+  },
+  {
+    "time": 700,
+    "signals": {
+      "X0": false,
+      "X1": false,
+      "Y0": false
+    }
+  }
+]

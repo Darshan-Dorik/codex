@@ -1,0 +1,72 @@
+[
+  {
+    "time": 100,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 200,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 300,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 400,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 500,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 600,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 700,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  }
+]
