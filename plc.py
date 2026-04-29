@@ -82,19 +82,24 @@ if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     from clock import SimulationClock
     
-    print("Phase 2 - Step 4: Time-Aware PLC Scan Test\n")
+    print("Phase 2 - Step 5: Time-Based TON Timer Test\n")
     
     plc = PLC()
     clock = SimulationClock()
     
-    print(f"Initial PLC last_scan_time: {plc.last_scan_time_ms} ms")
+    # Logic: TON timer T0, IN=X0, PT=1.5s
+    plc.logic = [
+        {"type": "ton", "id": "T0", "if": "X0", "pt": 1.5, "set": "Y0"}
+    ]
     
-    clock.advance(100)
-    print(f"\nAdvancing clock by 100 ms -> Clock Time: {clock.get_time()} ms")
-    plc.scan(clock.get_time())
-    print(f"PLC last_scan_time updated to: {plc.last_scan_time_ms} ms")
+    plc.inputs["X0"] = True
+    print("Input X0 = True. Timer PT = 1.5s")
     
-    clock.advance(50)
-    print(f"\nAdvancing clock by 50 ms -> Clock Time: {clock.get_time()} ms")
-    plc.scan(clock.get_time())
-    print(f"PLC last_scan_time updated to: {plc.last_scan_time_ms} ms")
+    # We will step the clock by 500ms (0.5s) intervals
+    for _ in range(4):
+        clock.advance(500)
+        plc.scan(clock.get_time())
+        t_ms = clock.get_time()
+        y0 = plc.outputs.get("Y0", False)
+        et = round(plc.timers["T0"].et, 2) if "T0" in plc.timers else 0.0
+        print(f"Clock: {t_ms} ms -> ET: {et}s | Y0: {y0}")
