@@ -1,0 +1,154 @@
+{
+  "program": "programs/shuttle_control.st",
+  "summary": {
+    "total_runs": 2,
+    "passed": 2,
+    "failed": 0,
+    "errors": 0,
+    "violations": 3,
+    "has_gaps": false
+  },
+  "failures": [
+    {
+      "scenario": "Shuttle [2]",
+      "status": "pass",
+      "errors": [],
+      "violations": [
+        {
+          "time": 300,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 300,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 400,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 400,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 500,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 500,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        }
+      ],
+      "error_msg": null
+    }
+  ],
+  "coverage_gaps": {
+    "conditions_never_true": [],
+    "conditions_never_false": [],
+    "branches_never_then": [],
+    "branches_never_else": [],
+    "fully_covered": [
+      "(X0 AND NOT(X2))",
+      "X1"
+    ]
+  },
+  "violations": [
+    {
+      "property": "Y0 must not be True when X1 is True",
+      "count": 3,
+      "scenarios": [
+        "Shuttle [2]"
+      ]
+    }
+  ],
+  "compressed_logs": [
+    {
+      "scenario": "Shuttle [2]",
+      "has_issues": true,
+      "compressed_log": {
+        "entries": [
+          {
+            "time": 200,
+            "inputs": {
+              "X0": true,
+              "X1": false,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": false
+            }
+          },
+          {
+            "time": 300,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          },
+          {
+            "time": 400,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          },
+          {
+            "time": 500,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        ],
+        "total_ticks": 5,
+        "kept_ticks": 4,
+        "dropped_ticks": 1,
+        "focus_times": [
+          300,
+          400,
+          500
+        ]
+      }
+    }
+  ]
+}

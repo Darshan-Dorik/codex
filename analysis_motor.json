@@ -1,0 +1,23 @@
+{
+  "program": "programs/motor_start.st",
+  "summary": {
+    "total_runs": 4,
+    "passed": 4,
+    "failed": 0,
+    "errors": 0,
+    "violations": 0,
+    "has_gaps": false
+  },
+  "failures": [],
+  "coverage_gaps": {
+    "conditions_never_true": [],
+    "conditions_never_false": [],
+    "branches_never_then": [],
+    "branches_never_else": [],
+    "fully_covered": [
+      "(X0 AND NOT(X1))"
+    ]
+  },
+  "violations": [],
+  "compressed_logs": []
+}
