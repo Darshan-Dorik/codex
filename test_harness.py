@@ -160,13 +160,86 @@ def create_example_scenario():
     return scenario
 
 
+class ScenarioRunner:
+    """
+    Runs multiple scenarios sequentially and collects a summary report.
+
+    Each entry in `scenarios` is a dict:
+      {
+        "scenario": <scenario dict>,
+        "logic":    <parsed logic list>,
+        "max_time_ms": int,   # optional, default 1000
+        "step_ms":     int    # optional, default 100
+      }
+    """
+
+    def __init__(self, verbose=True):
+        self.verbose = verbose   # if False, suppresses per-tick output
+        self.results = []        # list of result dicts after run_all()
+
+    def run_all(self, entries):
+        """Run every entry and populate self.results."""
+        self.results = []
+
+        for entry in entries:
+            scenario   = entry["scenario"]
+            logic      = entry.get("logic", [])
+            max_time   = entry.get("max_time_ms", 1000)
+            step       = entry.get("step_ms", 100)
+
+            harness = TestHarness()
+            harness.load_scenario(scenario)
+
+            if not self.verbose:
+                # Suppress per-tick print by temporarily redirecting stdout
+                import io, sys
+                old_stdout = sys.stdout
+                sys.stdout = io.StringIO()
+
+            harness.run(max_time_ms=max_time, step_ms=step, logic=logic)
+
+            if not self.verbose:
+                sys.stdout = old_stdout
+
+            assertion = harness.assert_expected()
+
+            self.results.append({
+                "name":   scenario["name"],
+                "passed": assertion["passed"],
+                "errors": assertion["errors"]
+            })
+
+        return self.results
+
+    def print_summary(self):
+        """Print a human-readable summary of all scenario results."""
+        total  = len(self.results)
+        passed = sum(1 for r in self.results if r["passed"])
+        failed = total - passed
+
+        print("=" * 55)
+        print("  SCENARIO RUNNER SUMMARY")
+        print("=" * 55)
+
+        for r in self.results:
+            status = "PASS" if r["passed"] else "FAIL"
+            print(f"  [{status}]  {r['name']}")
+            for err in r["errors"]:
+                print(f"           ERROR: {err}")
+
+        print("-" * 55)
+        print(f"  Total: {total}  |  Passed: {passed}  |  Failed: {failed}")
+        print("=" * 55)
+
+
 if __name__ == "__main__":
     print("=" * 55)
-    print("Phase 3 - Step 5: Assertion Engine Test")
+    print("Phase 3 - Step 6: Multi-Scenario Runner Test")
     print("=" * 55)
 
     from st_parser import parse_st
 
+    # --- Shared logic ---
     st_code = """
     IF X0 THEN
         Y0 := TRUE;
@@ -175,61 +248,53 @@ if __name__ == "__main__":
     logic = parse_st(st_code)
 
     # --------------------------------------------------
-    # TEST CASE 1: PASSING — Y0 should be True at 600ms
+    # Scenario 1: PASS — motor off before event, on after
     # --------------------------------------------------
-    print("\n[Test Case 1] PASSING scenario")
-    passing_scenario = {
-        "name": "Motor Start - Passing",
+    scenario_1 = {
+        "name": "Motor Off Then On (PASS)",
         "initial_inputs": {"X0": False},
-        "events": [
-            {"time": 500, "inputs": {"X0": True}}
-        ],
+        "events": [{"time": 300, "inputs": {"X0": True}}],
         "expected": [
-            {"time": 400, "outputs": {"Y0": False}},   # before event: motor off
-            {"time": 600, "outputs": {"Y0": True}}     # after event:  motor on
+            {"time": 200, "outputs": {"Y0": False}},
+            {"time": 400, "outputs": {"Y0": True}},
+            {"time": 500, "outputs": {"Y0": True}}
         ]
     }
 
-    harness = TestHarness()
-    harness.load_scenario(passing_scenario)
-    harness.run(max_time_ms=700, step_ms=100, logic=logic)
-
-    result = harness.assert_expected()
-    print(f"\n  Result: {'PASS' if result['passed'] else 'FAIL'}")
-    if result["errors"]:
-        for err in result["errors"]:
-            print(f"  ERROR: {err}")
-    else:
-        print("  All assertions passed.")
-
     # --------------------------------------------------
-    # TEST CASE 2: FAILING — wrong expectation at 300ms
+    # Scenario 2: PASS — motor stays off (no start event)
     # --------------------------------------------------
-    print("\n[Test Case 2] FAILING scenario")
-    failing_scenario = {
-        "name": "Motor Start - Failing",
+    scenario_2 = {
+        "name": "Motor Never Starts (PASS)",
         "initial_inputs": {"X0": False},
-        "events": [
-            {"time": 500, "inputs": {"X0": True}}
-        ],
+        "events": [],
         "expected": [
-            # Wrong: Y0 should still be False at 300ms (X0 not yet set)
-            {"time": 300, "outputs": {"Y0": True}},
-            # Wrong: Y0 should be True at 600ms, not False
-            {"time": 600, "outputs": {"Y0": False}},
-            # Wrong: querying a time outside the simulation window
-            {"time": 900, "outputs": {"Y0": True}}
+            {"time": 200, "outputs": {"Y0": False}},
+            {"time": 500, "outputs": {"Y0": False}}
         ]
     }
 
-    harness2 = TestHarness()
-    harness2.load_scenario(failing_scenario)
-    harness2.run(max_time_ms=700, step_ms=100, logic=logic)
+    # --------------------------------------------------
+    # Scenario 3: FAIL — wrong expectation on purpose
+    # --------------------------------------------------
+    scenario_3 = {
+        "name": "Wrong Expectation (FAIL)",
+        "initial_inputs": {"X0": False},
+        "events": [{"time": 300, "inputs": {"X0": True}}],
+        "expected": [
+            # Motor should be False at 200ms, not True
+            {"time": 200, "outputs": {"Y0": True}},
+            # Motor should be True at 400ms, not False
+            {"time": 400, "outputs": {"Y0": False}}
+        ]
+    }
 
-    result2 = harness2.assert_expected()
-    print(f"\n  Result: {'PASS' if result2['passed'] else 'FAIL'}")
-    if result2["errors"]:
-        for err in result2["errors"]:
-            print(f"  ERROR: {err}")
-    else:
-        print("  All assertions passed.")
+    entries = [
+        {"scenario": scenario_1, "logic": logic, "max_time_ms": 600, "step_ms": 100},
+        {"scenario": scenario_2, "logic": logic, "max_time_ms": 600, "step_ms": 100},
+        {"scenario": scenario_3, "logic": logic, "max_time_ms": 600, "step_ms": 100},
+    ]
+
+    runner = ScenarioRunner(verbose=False)  # suppress per-tick noise
+    runner.run_all(entries)
+    runner.print_summary()
