@@ -27,19 +27,28 @@ class TestHarness:
             
         print(f"Initial inputs applied: {self.plc.inputs}")
         
+        events = self.scenario.get("events", [])
+        
         # Run simulation over time
         while self.clock.get_time() < max_time_ms:
             self.clock.advance(step_ms)
             current_time = self.clock.get_time()
             
-            # Scan PLC
+            # 1. Process Event Injections (BEFORE Scan)
+            for event in events:
+                if event["time"] == current_time:
+                    print(f"  [Event] At {current_time}ms: Injecting {event['inputs']}")
+                    for k, v in event["inputs"].items():
+                        self.plc.inputs[k] = v
+            
+            # 2. Scan PLC
             self.plc.scan(current_time)
             
             # Simple fixed wiring for test harness
             if "Y0" in self.plc.outputs:
                 self.loom.motor_running = self.plc.outputs["Y0"]
             
-            # Update Loom
+            # 3. Update Loom
             self.loom.update(current_time)
             
             print(f"Time: {current_time}ms | PLC Inputs: {self.plc.inputs} | PLC Outputs: {self.plc.outputs}")
@@ -60,7 +69,7 @@ def create_example_scenario():
     return scenario
 
 if __name__ == "__main__":
-    print("Phase 3 - Step 2: Scenario Runner Engine Test\n")
+    print("Phase 3 - Step 3: Event Injection System Test\n")
     
     scenario = create_example_scenario()
     
