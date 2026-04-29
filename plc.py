@@ -46,6 +46,14 @@ class PLC:
                 in_state = self.inputs.get(condition_var, False)
                 timer_q = self.timers[timer_id].update(in_state, dt)
                 self.outputs[target_var] = timer_q
+            elif rule.get("type") == "interlock":
+                run_cond = rule.get("run")
+                stop_cond = rule.get("stop")
+                target_var = rule.get("set")
+                
+                run_state = self.inputs.get(run_cond, False)
+                stop_state = self.inputs.get(stop_cond, False)
+                self.outputs[target_var] = run_state and not stop_state
 
 if __name__ == "__main__":
     # Test Step 4

@@ -56,5 +56,44 @@ def test_step7():
         x1 = plc.inputs.get("X1", False)
         print(f"Time: {time_elapsed}s | Shuttle Pos: {pos} | PLC Input X1: {x1}")
 
+def test_step8():
+    plc = PLC()
+    loom = LoomState()
+    
+    # Logic: Run motor if X0 is True, BUT stop if Jam (X2) is True
+    plc.logic = [
+        {"type": "interlock", "run": "X0", "stop": "X2", "set": "Y0"}
+    ]
+    
+    print("\nTesting Step 8: Fault Injection (Jam Condition)")
+    
+    plc.inputs["X0"] = True # Start command
+    plc.inputs["X2"] = False # No jam initially
+    
+    for i in range(15):
+        # Inject Fault at t = 0.5s
+        if i == 5:
+            print(">>> INJECTING JAM FAULT! <<<")
+            loom.jam_detected = True
+            
+        # Connect Loom Sensors -> PLC
+        # If loom is jammed, PLC sensor X2 detects it
+        if loom.jam_detected:
+            plc.inputs["X2"] = True
+            
+        # Scan PLC
+        plc.scan(dt=0.1)
+        
+        # Connect PLC -> Loom
+        loom.motor_running = plc.outputs.get("Y0", False)
+        
+        # Update Loom
+        loom.update(dt=0.1)
+        
+        time_elapsed = round((i + 1) * 0.1, 1)
+        pos = round(loom.shuttle_position, 1)
+        y0 = plc.outputs.get("Y0")
+        print(f"Time: {time_elapsed}s | Jam: {loom.jam_detected} | PLC Y0: {y0} | Shuttle Pos: {pos}")
+
 if __name__ == "__main__":
-    test_step7()
+    test_step8()
