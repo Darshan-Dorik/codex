@@ -129,9 +129,23 @@ def main(argv=None):
         print("\n[DRY RUN] Config is valid. No simulation will be run.")
         return 0
 
-    # --- Full pipeline (Steps 3-10 will plug in here) ---
-    print("\n[INFO] Config loaded successfully.")
-    print("[INFO] Full pipeline not yet implemented — coming in Step 3.")
+    # --- Full pipeline ---
+    print("\n[INFO] Config loaded successfully. Starting pipeline...")
+    print()
+
+    from tool.orchestrator import run_pipeline
+    result = run_pipeline(config, verbose=True)
+
+    print()
+    if result["status"] == "error":
+        print(f"PIPELINE ERROR: {result['error']}")
+        return 1
+
+    agg = result["aggregation"]
+    print(f"\n[DONE] {result['scenarios_run']} scenarios — "
+          f"passed={agg.get('passed',0)} "
+          f"failed={agg.get('failed',0)} "
+          f"violations={agg.get('violations',0)}")
     return 0
 
 
