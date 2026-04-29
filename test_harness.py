@@ -107,6 +107,42 @@ class TestHarness:
                 return entry["outputs"]
         return None
 
+    def assert_expected(self):
+        """
+        Compare scenario's expected outputs against the captured timeline.
+
+        Returns a dict:
+          {
+            "passed": bool,
+            "errors": ["At 500ms: expected Y0=True, got False", ...]
+          }
+        """
+        errors = []
+        expected_list = self.scenario.get("expected", [])
+
+        for expectation in expected_list:
+            t = expectation["time"]
+            expected_outputs = expectation["outputs"]
+            actual_outputs = self.get_output_at(t)
+
+            if actual_outputs is None:
+                errors.append(
+                    f"At {t}ms: no data captured (simulation may not have reached this time)"
+                )
+                continue
+
+            for key, expected_val in expected_outputs.items():
+                actual_val = actual_outputs.get(key)
+                if actual_val != expected_val:
+                    errors.append(
+                        f"At {t}ms: expected {key}={expected_val}, got {actual_val}"
+                    )
+
+        return {
+            "passed": len(errors) == 0,
+            "errors": errors
+        }
+
 
 def create_example_scenario():
     scenario = {
@@ -126,7 +162,7 @@ def create_example_scenario():
 
 if __name__ == "__main__":
     print("=" * 55)
-    print("Phase 3 - Step 4: Output Capture System Test")
+    print("Phase 3 - Step 5: Assertion Engine Test")
     print("=" * 55)
 
     from st_parser import parse_st
@@ -136,30 +172,64 @@ if __name__ == "__main__":
         Y0 := TRUE;
     END_IF;
     """
+    logic = parse_st(st_code)
 
-    scenario = create_example_scenario()
+    # --------------------------------------------------
+    # TEST CASE 1: PASSING — Y0 should be True at 600ms
+    # --------------------------------------------------
+    print("\n[Test Case 1] PASSING scenario")
+    passing_scenario = {
+        "name": "Motor Start - Passing",
+        "initial_inputs": {"X0": False},
+        "events": [
+            {"time": 500, "inputs": {"X0": True}}
+        ],
+        "expected": [
+            {"time": 400, "outputs": {"Y0": False}},   # before event: motor off
+            {"time": 600, "outputs": {"Y0": True}}     # after event:  motor on
+        ]
+    }
+
     harness = TestHarness()
-    harness.load_scenario(scenario)
+    harness.load_scenario(passing_scenario)
+    harness.run(max_time_ms=700, step_ms=100, logic=logic)
 
-    print()
-    harness.run(max_time_ms=700, step_ms=100, logic=parse_st(st_code))
+    result = harness.assert_expected()
+    print(f"\n  Result: {'PASS' if result['passed'] else 'FAIL'}")
+    if result["errors"]:
+        for err in result["errors"]:
+            print(f"  ERROR: {err}")
+    else:
+        print("  All assertions passed.")
 
-    # --- Human-readable timeline table ---
-    print()
-    print("--- Captured Output Timeline (Table) ---")
-    harness.print_output_timeline()
+    # --------------------------------------------------
+    # TEST CASE 2: FAILING — wrong expectation at 300ms
+    # --------------------------------------------------
+    print("\n[Test Case 2] FAILING scenario")
+    failing_scenario = {
+        "name": "Motor Start - Failing",
+        "initial_inputs": {"X0": False},
+        "events": [
+            {"time": 500, "inputs": {"X0": True}}
+        ],
+        "expected": [
+            # Wrong: Y0 should still be False at 300ms (X0 not yet set)
+            {"time": 300, "outputs": {"Y0": True}},
+            # Wrong: Y0 should be True at 600ms, not False
+            {"time": 600, "outputs": {"Y0": False}},
+            # Wrong: querying a time outside the simulation window
+            {"time": 900, "outputs": {"Y0": True}}
+        ]
+    }
 
-    # --- Raw JSON for verification ---
-    print()
-    print("--- Captured Output Timeline (JSON) ---")
-    print(json.dumps(harness.output_timeline, indent=2))
+    harness2 = TestHarness()
+    harness2.load_scenario(failing_scenario)
+    harness2.run(max_time_ms=700, step_ms=100, logic=logic)
 
-    # --- Spot-check: query a specific time ---
-    print()
-    print("--- Spot-check: get_output_at(600ms) ---")
-    result = harness.get_output_at(600)
-    print(f"  Outputs at 600ms: {result}")
-    expected_y0 = True
-    actual_y0   = result.get("Y0") if result else None
-    status = "PASS" if actual_y0 == expected_y0 else "FAIL"
-    print(f"  Y0 expected={expected_y0}, got={actual_y0} -> [{status}]")
+    result2 = harness2.assert_expected()
+    print(f"\n  Result: {'PASS' if result2['passed'] else 'FAIL'}")
+    if result2["errors"]:
+        for err in result2["errors"]:
+            print(f"  ERROR: {err}")
+    else:
+        print("  All assertions passed.")
