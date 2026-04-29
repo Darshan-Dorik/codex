@@ -75,6 +75,8 @@ class PLC:
         self.last_scan_time_ms = 0
         # Coverage tracking: {"condition_label": {"true": int, "false": int}}
         self.coverage = {}
+        # Branch coverage: {"condition_label": {"then": int, "else": int}}
+        self.branch_coverage = {}
 
     def scan(self, current_time_ms):
         # Calculate delta time in seconds for timers
@@ -109,6 +111,14 @@ class PLC:
                     self.coverage[label]["true"] += 1
                 else:
                     self.coverage[label]["false"] += 1
+
+                # --- Branch coverage tracking ---
+                if label not in self.branch_coverage:
+                    self.branch_coverage[label] = {"then": 0, "else": 0}
+                if cond_result:
+                    self.branch_coverage[label]["then"] += 1
+                else:
+                    self.branch_coverage[label]["else"] += 1
 
                 body = rule["then_body"] if cond_result else rule["else_body"]
                 for stmt in body:
@@ -149,66 +159,100 @@ class PLC:
 if __name__ == "__main__":
     import sys, os
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-    from clock import SimulationClock
     from st_parser import parse_st
 
     print("=" * 60)
-    print("Phase 4 - Step 5: Coverage Tracking — Conditions")
+    print("Phase 4 - Step 6: Coverage Tracking — Branches")
     print("=" * 60)
 
-    st_code = """
+    # -------------------------------------------------------
+    # Scenario A: IF/ELSE — 4 THEN, 2 ELSE
+    # -------------------------------------------------------
+    st_a = """
+    IF X0 THEN
+        Y0 := TRUE;
+    ELSE
+        Y0 := FALSE;
+    END_IF;
+    """
+    plc_a = PLC()
+    plc_a.logic = parse_st(st_a)
+
+    schedule_a = [
+        (100, {"X0": True}),   # THEN
+        (200, {"X0": False}),  # ELSE
+        (300, {"X0": True}),   # THEN
+        (400, {"X0": True}),   # THEN
+        (500, {"X0": False}),  # ELSE
+        (600, {"X0": True}),   # THEN
+    ]
+
+    print("\nScenario A — IF X0 THEN Y0:=TRUE ELSE Y0:=FALSE")
+    print(f"  {'Time':>6}  {'X0':>5}  {'Branch':>6}")
+    print("  " + "-" * 28)
+    for t, inputs in schedule_a:
+        plc_a.inputs = dict(inputs)
+        plc_a.scan(t)
+        branch = "THEN" if inputs["X0"] else "ELSE"
+        print(f"  {t:>6}ms  {str(inputs['X0']):>5}  {branch:>6}")
+
+    lbl_a = "X0"
+    print(f"\n  Branch coverage for '{lbl_a}':")
+    print(f"    THEN taken: {plc_a.branch_coverage[lbl_a]['then']}")
+    print(f"    ELSE taken: {plc_a.branch_coverage[lbl_a]['else']}")
+
+    # -------------------------------------------------------
+    # Scenario B: AND NOT condition — 3 THEN, 3 ELSE
+    # (same schedule as Step 5 to cross-verify)
+    # -------------------------------------------------------
+    st_b = """
     IF X0 AND NOT X1 THEN
         Y0 := TRUE;
     ELSE
         Y0 := FALSE;
     END_IF;
     """
+    plc_b = PLC()
+    plc_b.logic = parse_st(st_b)
 
-    plc = PLC()
-    plc.logic = parse_st(st_code)
-    clock = SimulationClock()
-
-    # 6 scan cycles with varying inputs:
-    #   t=100: X0=T, X1=F  -> condition TRUE
-    #   t=200: X0=T, X1=T  -> condition FALSE
-    #   t=300: X0=F, X1=F  -> condition FALSE
-    #   t=400: X0=T, X1=F  -> condition TRUE
-    #   t=500: X0=T, X1=F  -> condition TRUE
-    #   t=600: X0=F, X1=T  -> condition FALSE
-
-    schedule = [
-        (100, {"X0": True,  "X1": False}),
-        (200, {"X0": True,  "X1": True}),
-        (300, {"X0": False, "X1": False}),
-        (400, {"X0": True,  "X1": False}),
-        (500, {"X0": True,  "X1": False}),
-        (600, {"X0": False, "X1": True}),
+    schedule_b = [
+        (100, {"X0": True,  "X1": False}),  # THEN
+        (200, {"X0": True,  "X1": True}),   # ELSE
+        (300, {"X0": False, "X1": False}),  # ELSE
+        (400, {"X0": True,  "X1": False}),  # THEN
+        (500, {"X0": True,  "X1": False}),  # THEN
+        (600, {"X0": False, "X1": True}),   # ELSE
     ]
 
-    print(f"\n  Logic: {st_code.strip()}\n")
-    print(f"  {'Time':>6}  {'X0':>5}  {'X1':>5}  {'Y0':>5}  {'Cond':>6}")
-    print("  " + "-" * 40)
+    print("\nScenario B — IF X0 AND NOT X1 THEN Y0:=TRUE ELSE Y0:=FALSE")
+    print(f"  {'Time':>6}  {'X0':>5}  {'X1':>5}  {'Branch':>6}")
+    print("  " + "-" * 34)
+    for t, inputs in schedule_b:
+        plc_b.inputs = dict(inputs)
+        plc_b.scan(t)
+        cond = inputs["X0"] and not inputs["X1"]
+        branch = "THEN" if cond else "ELSE"
+        print(f"  {t:>6}ms  {str(inputs['X0']):>5}  {str(inputs['X1']):>5}  {branch:>6}")
 
-    for t, inputs in schedule:
-        plc.inputs = dict(inputs)
-        plc.scan(t)
-        y0   = plc.outputs.get("Y0", "-")
-        cond = "TRUE" if y0 is True else "FALSE"
-        print(f"  {t:>6}ms  {str(inputs['X0']):>5}  {str(inputs['X1']):>5}  "
-              f"{str(y0):>5}  {cond}")
+    lbl_b = "(X0 AND NOT(X1))"
+    print(f"\n  Branch coverage for '{lbl_b}':")
+    print(f"    THEN taken: {plc_b.branch_coverage[lbl_b]['then']}")
+    print(f"    ELSE taken: {plc_b.branch_coverage[lbl_b]['else']}")
 
-    # --- Print coverage stats ---
-    print("\n  --- Condition Coverage ---")
-    for lbl, counts in plc.coverage.items():
-        total = counts["true"] + counts["false"]
-        print(f"  Condition : {lbl}")
-        print(f"    TRUE    : {counts['true']} / {total}")
-        print(f"    FALSE   : {counts['false']} / {total}")
-
-    # --- Assertions ---
+    # -------------------------------------------------------
+    # Assertions
+    # -------------------------------------------------------
     print("\n  --- Assertions ---")
-    lbl = "(X0 AND NOT(X1))"
-    assert lbl in plc.coverage,                   f"Label '{lbl}' not found"
-    assert plc.coverage[lbl]["true"]  == 3,       "Expected 3 TRUE evaluations"
-    assert plc.coverage[lbl]["false"] == 3,       "Expected 3 FALSE evaluations"
-    print(f"  PASS — '{lbl}': true=3, false=3")
+
+    assert plc_a.branch_coverage[lbl_a]["then"] == 4, "Scenario A: expected 4 THEN"
+    assert plc_a.branch_coverage[lbl_a]["else"] == 2, "Scenario A: expected 2 ELSE"
+    print(f"  PASS — Scenario A: then=4, else=2")
+
+    assert plc_b.branch_coverage[lbl_b]["then"] == 3, "Scenario B: expected 3 THEN"
+    assert plc_b.branch_coverage[lbl_b]["else"] == 3, "Scenario B: expected 3 ELSE"
+    print(f"  PASS — Scenario B: then=3, else=3")
+
+    # Verify branch_coverage and coverage stay in sync
+    assert plc_b.branch_coverage[lbl_b]["then"] == plc_b.coverage[lbl_b]["true"]
+    assert plc_b.branch_coverage[lbl_b]["else"] == plc_b.coverage[lbl_b]["false"]
+    print(f"  PASS — branch_coverage and coverage counts are consistent")
