@@ -1,0 +1,63 @@
+{
+  "summary": {
+    "total": 4,
+    "passed": 3,
+    "failed": 1
+  },
+  "scenarios": [
+    {
+      "scenario": "Motor Start with TON Delay (0.5s)",
+      "status": "pass",
+      "errors": [],
+      "snapshots": []
+    },
+    {
+      "scenario": "Shuttle Position Sensor Trigger",
+      "status": "pass",
+      "errors": [],
+      "snapshots": []
+    },
+    {
+      "scenario": "Jam Detection Stops Motor",
+      "status": "pass",
+      "errors": [],
+      "snapshots": []
+    },
+    {
+      "scenario": "Intentional Failure (for report demo)",
+      "status": "fail",
+      "errors": [
+        "At 300ms: expected Y0=True, got False",
+        "At 900ms: no data captured (simulation may not have reached this time)"
+      ],
+      "snapshots": [
+        {
+          "timestamp_ms": 300,
+          "reason": "At 300ms: expected Y0=True, got False",
+          "inputs": {
+            "X0": false
+          },
+          "outputs": {
+            "Y0": false
+          },
+          "loom_state": {
+            "motor_running": false,
+            "shuttle_position": 0.0,
+            "jam_detected": false
+          }
+        },
+        {
+          "timestamp_ms": 900,
+          "reason": "no data captured",
+          "inputs": {},
+          "outputs": {},
+          "loom_state": {
+            "motor_running": false,
+            "shuttle_position": 0.0,
+            "jam_detected": false
+          }
+        }
+      ]
+    }
+  ]
+}

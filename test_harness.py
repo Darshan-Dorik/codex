@@ -345,86 +345,150 @@ class ScenarioRunner:
         print(f"  Total: {total}  |  Passed: {passed}  |  Failed: {failed}")
         print("=" * 55)
 
+    def export_report(self):
+        """
+        Build and return a structured JSON-compatible report dict.
+
+        Schema:
+          {
+            "summary": {
+              "total": int,
+              "passed": int,
+              "failed": int
+            },
+            "scenarios": [
+              {
+                "scenario": str,
+                "status":   "pass" | "fail",
+                "errors":   [...],
+                "snapshots": [...]
+              }
+            ]
+          }
+        """
+        total  = len(self.results)
+        passed = sum(1 for r in self.results if r["passed"])
+        failed = total - passed
+
+        scenarios = []
+        for r in self.results:
+            scenarios.append({
+                "scenario":  r["name"],
+                "status":    "pass" if r["passed"] else "fail",
+                "errors":    r["errors"],
+                "snapshots": r.get("snapshots", [])
+            })
+
+        return {
+            "summary": {
+                "total":  total,
+                "passed": passed,
+                "failed": failed
+            },
+            "scenarios": scenarios
+        }
+
+    def save_report(self, filepath="test_report.json"):
+        """Write the exported report to a JSON file."""
+        report = self.export_report()
+        with open(filepath, "w") as f:
+            json.dump(report, f, indent=2)
+        print(f"  Report saved to: {filepath}")
+
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("Phase 3 - Step 9: Deterministic Replay")
+    print("Phase 3 - Step 10: Export Test Report")
     print("=" * 60)
 
     from st_parser import parse_st
 
-    # -------------------------------------------------------
-    # Scenario: jam detection with TON delay — exercises
-    # timers, wiring callbacks, and event injection together.
-    # A non-deterministic system would diverge on re-runs.
-    # -------------------------------------------------------
-    logic = [
-        {"type": "ton", "id": "T0", "if": "X0", "pt": 0.3, "set": "Y0"},
-        {"type": "interlock", "run": "Y0", "stop": "X2", "set": "Y1"}
+    # --- Logic definitions ---
+    logic_ton = [
+        {"type": "ton", "id": "T0", "if": "X0", "pt": 0.5, "set": "Y0"}
+    ]
+    logic_assign = parse_st("""
+    IF X0 THEN
+        Y0 := TRUE;
+    END_IF;
+    """)
+    logic_interlock = [
+        {"type": "interlock", "run": "X0", "stop": "X2", "set": "Y0"}
     ]
 
-    def wiring_replay(plc, loom, t):
-        if t >= 500:
+    # --- Wiring callbacks ---
+    def wiring_shuttle(plc, loom, t):
+        plc.inputs["X1"] = loom.shuttle_position > 15.0
+
+    def wiring_jam(plc, loom, t):
+        if t >= 400:
             loom.jam_detected = True
         plc.inputs["X2"] = loom.jam_detected
 
-    scenario = {
-        "name": "Deterministic Replay Test",
+    # --- Scenarios ---
+    scenario_1 = {
+        "name": "Motor Start with TON Delay (0.5s)",
+        "initial_inputs": {"X0": False},
+        "events": [{"time": 200, "inputs": {"X0": True}}],
+        "expected": [
+            {"time": 400, "outputs": {"Y0": False}},
+            {"time": 700, "outputs": {"Y0": True}},
+            {"time": 900, "outputs": {"Y0": True}}
+        ]
+    }
+    scenario_2 = {
+        "name": "Shuttle Position Sensor Trigger",
+        "initial_inputs": {"X0": True},
+        "events": [],
+        "expected": [
+            {"time": 1000, "outputs": {"Y0": True}},
+            {"time": 2000, "outputs": {"Y0": True}}
+        ]
+    }
+    scenario_3 = {
+        "name": "Jam Detection Stops Motor",
         "initial_inputs": {"X0": True, "X2": False},
-        "events": [
-            {"time": 200, "inputs": {"X0": False}},   # stop timer briefly
-            {"time": 400, "inputs": {"X0": True}}     # restart timer
-        ],
-        "expected": []   # no assertions needed — replay itself is the test
+        "events": [],
+        "expected": [
+            {"time": 300, "outputs": {"Y0": True}},
+            {"time": 500, "outputs": {"Y0": False}},
+            {"time": 700, "outputs": {"Y0": False}}
+        ]
+    }
+    # Deliberately failing scenario to show error reporting in report
+    scenario_4 = {
+        "name": "Intentional Failure (for report demo)",
+        "initial_inputs": {"X0": False},
+        "events": [],
+        "expected": [
+            {"time": 300, "outputs": {"Y0": True}},   # wrong: Y0 is False
+            {"time": 900, "outputs": {"Y0": True}}    # out of range
+        ]
     }
 
-    harness = TestHarness()
-    harness.load_scenario(scenario)
-
-    import io, sys
-
-    # Suppress per-tick output during replay (keep output clean)
-    old_stdout = sys.stdout
-    sys.stdout = io.StringIO()
-
-    result = harness.replay_verify(
-        runs=3,
-        max_time_ms=900,
-        step_ms=100,
-        logic=logic,
-        wiring=wiring_replay
-    )
-
-    sys.stdout = old_stdout
-
-    # --- Report ---
-    status = "DETERMINISTIC" if result["deterministic"] else "NON-DETERMINISTIC"
-    print(f"\n  Replay result: [{status}]")
-    print(f"  Runs executed: {len(result['timelines'])}")
-    print(f"  Ticks per run: {len(result['timelines'][0])}")
-
-    if result["diffs"]:
-        print("\n  DIFFERENCES FOUND:")
-        for d in result["diffs"]:
-            print(f"    {d}")
-    else:
-        print("  All runs produced identical output timelines.")
-
-    # --- Side-by-side spot check: show tick 5 from each run ---
-    print("\n  Spot-check: tick index 5 across all runs")
-    for i, tl in enumerate(result["timelines"], 1):
-        entry = tl[5]
-        print(f"    Run {i} | t={entry['time']}ms | "
-              f"inputs={entry['inputs']} | outputs={entry['outputs']}")
-
-    # --- Verify assertion engine still works on replayed timeline ---
-    print("\n  Assertion check on final replay timeline:")
-    harness.output_timeline = result["timelines"][-1]
-    harness.scenario["expected"] = [
-        {"time": 400, "outputs": {"Y0": False}},  # timer reset, not yet fired
-        {"time": 800, "outputs": {"Y1": False}}   # jam active, Y1 interlocked off
+    entries = [
+        {"scenario": scenario_1, "logic": logic_ton,
+         "max_time_ms": 1000, "step_ms": 100},
+        {"scenario": scenario_2, "logic": logic_assign,
+         "wiring": wiring_shuttle, "max_time_ms": 2100, "step_ms": 100},
+        {"scenario": scenario_3, "logic": logic_interlock,
+         "wiring": wiring_jam, "max_time_ms": 800, "step_ms": 100},
+        {"scenario": scenario_4, "logic": logic_ton,
+         "max_time_ms": 700, "step_ms": 100},
     ]
-    assertion = harness.assert_expected()
-    print(f"  Result: {'PASS' if assertion['passed'] else 'FAIL'}")
-    for err in assertion["errors"]:
-        print(f"  ERROR: {err}")
+
+    runner = ScenarioRunner(verbose=False)
+    runner.run_all(entries)
+
+    # --- Console summary ---
+    runner.print_summary()
+
+    # --- Export and print JSON report ---
+    report = runner.export_report()
+    print()
+    print("--- Exported JSON Report ---")
+    print(json.dumps(report, indent=2))
+
+    # --- Save to file ---
+    print()
+    runner.save_report("test_report.json")
