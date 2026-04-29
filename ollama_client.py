@@ -18,7 +18,7 @@ import urllib.error
 # Default configuration — can be overridden by callers
 DEFAULT_MODEL   = "mistral:latest"
 DEFAULT_HOST    = "http://localhost:11434"
-DEFAULT_TIMEOUT = 120   # seconds
+DEFAULT_TIMEOUT = 300   # seconds — generous for 7B model on CPU
 
 
 def call_llm(prompt, model=DEFAULT_MODEL, host=DEFAULT_HOST,
