@@ -1,53 +1,46 @@
 import json
 
-def generate_ollama_prompt(logic, final_state, logs):
+def build_llm_payload(current_state, logic, recent_logs):
     """
-    Format the logic, state, and logs into a structured prompt for Ollama.
-    (No API implementation yet, only structure as requested)
+    Builds a structured JSON payload for the LLM interface.
     """
-    prompt = f"""You are an AI diagnostic assistant for a digital twin PLC system.
-Below is the system configuration, the logical rules, and the execution logs.
-
-### 1. PLC Logic Rules (DSL)
-```json
-{json.dumps(logic, indent=2)}
-```
-
-### 2. Final System State
-```json
-{json.dumps(final_state, indent=2)}
-```
-
-### 3. Execution Logs (Telemetry)
-```json
-{json.dumps(logs, indent=2)}
-```
-
----
-Task:
-Please analyze the execution logs and identify if any fault (e.g., jam) occurred. 
-Determine when it occurred, and verify if the PLC logic reacted correctly to stop the motor.
-"""
-    return prompt
+    payload = {
+        "system_state": current_state,
+        "plc_logic_ast": logic,
+        "execution_telemetry": recent_logs
+    }
+    return json.dumps(payload, indent=2)
 
 if __name__ == "__main__":
-    # Test Step 10 Structure
-    dummy_logic = [{"type": "interlock", "run": "X0", "stop": "X2", "set": "Y0"}]
-    dummy_state = {"motor_running": False, "shuttle_position": 5.0, "jam_detected": True}
+    print("Phase 2 - Step 10: Prepare LLM Interface Test\n")
+    
+    # 1. Dummy State
+    dummy_state = {
+        "motor_running": False,
+        "shuttle_position": 2.0,
+        "jam_detected": True
+    }
+    
+    # 2. Dummy Logic (AST)
+    dummy_logic = [
+        {"type": "assign", "if": "X0", "set": "Y0"}
+    ]
+    
+    # 3. Dummy Telemetry (Recent Logs)
     dummy_logs = [
         {
-            "time": 0.4, 
-            "plc": {"inputs": {"X0": True, "X2": False}, "outputs": {"Y0": True}}, 
-            "loom": {"motor_running": True, "shuttle_position": 4.0, "jam_detected": False}
+            "time": 200, 
+            "plc": {"inputs": {"X0": True}, "outputs": {"Y0": True}}, 
+            "loom": {"motor_running": True, "shuttle_position": 2.0, "jam_detected": False}
         },
         {
-            "time": 0.5, 
-            "plc": {"inputs": {"X0": True, "X2": True}, "outputs": {"Y0": False}}, 
-            "loom": {"motor_running": False, "shuttle_position": 4.0, "jam_detected": True}
+            "time": 300, 
+            "plc": {"inputs": {"X0": False}, "outputs": {"Y0": False}}, 
+            "loom": {"motor_running": False, "shuttle_position": 2.0, "jam_detected": True}
         }
     ]
     
-    print("Testing Step 10: Ollama Prompt Generation Structure\n")
-    prompt = generate_ollama_prompt(dummy_logic, dummy_state, dummy_logs)
-    print("--- Generated Prompt ---")
-    print(prompt)
+    payload_json = build_llm_payload(dummy_state, dummy_logic, dummy_logs)
+    
+    print("--- Generated JSON Payload for LLM ---")
+    print(payload_json)
