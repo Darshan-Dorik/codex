@@ -167,5 +167,50 @@ def test_phase2_step8():
     plc.scan(clock.get_time())
     print(f"  Input X0={plc.inputs['X0']} -> Output Y0={plc.outputs.get('Y0')} (Expected: False)")
 
+def test_phase2_step9():
+    from logger import SystemLogger
+    from plc import PLC
+    from loom import LoomState
+    from clock import SimulationClock
+    from st_parser import parse_st
+    
+    print("\nPhase 2 - Step 9: Logging with Time Context")
+    
+    plc = PLC()
+    loom = LoomState()
+    logger = SystemLogger()
+    clock = SimulationClock()
+    
+    st_code = """
+    IF X0 THEN
+        Y0 := TRUE;
+    END_IF;
+    """
+    plc.logic = parse_st(st_code)
+    
+    plc.inputs["X0"] = True
+    loom.motor_running = False
+    
+    for i in range(5):
+        clock.advance(100) # 100ms per scan cycle
+        current_time_ms = clock.get_time()
+        
+        # Simulate Jam at 300ms
+        if current_time_ms == 300:
+            loom.jam_detected = True
+            
+        if loom.jam_detected:
+            plc.inputs["X0"] = False # Interlock triggering stop
+            
+        plc.scan(current_time_ms)
+        loom.motor_running = plc.outputs.get("Y0", False)
+        loom.update(current_time_ms)
+        
+        # Log the state using exact global clock time
+        logger.log_cycle(current_time_ms, plc.inputs, plc.outputs, loom)
+        
+    print("\n--- Structured Logs (Phase 2 Time-Aware) ---")
+    logger.print_logs()
+
 if __name__ == "__main__":
-    test_phase2_step8()
+    test_phase2_step9()
