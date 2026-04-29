@@ -203,6 +203,59 @@ class TestHarness:
             print(f"  Outputs   : {snap['outputs']}")
             print(f"  Loom State: {snap['loom_state']}")
 
+    def replay_verify(self, runs=2, max_time_ms=1000, step_ms=100,
+                      logic=None, wiring=None):
+        """
+        Run the loaded scenario `runs` times and verify every timeline is
+        identical to the first run.
+
+        Returns a dict:
+          {
+            "deterministic": bool,
+            "timelines": [ <timeline from each run> ],
+            "diffs": [ "Run 2 differs at tick index 3: ..." ]
+          }
+        """
+        timelines = []
+
+        for run_num in range(1, runs + 1):
+            # Reset timeline before each run
+            self.output_timeline = []
+            self.run(
+                max_time_ms=max_time_ms,
+                step_ms=step_ms,
+                logic=logic,
+                wiring=wiring
+            )
+            timelines.append(list(self.output_timeline))  # deep copy of list
+
+        # Compare every subsequent run against run 1
+        reference = timelines[0]
+        diffs = []
+
+        for run_idx, timeline in enumerate(timelines[1:], start=2):
+            if len(timeline) != len(reference):
+                diffs.append(
+                    f"Run {run_idx}: tick count differs "
+                    f"(expected {len(reference)}, got {len(timeline)})"
+                )
+                continue
+            for i, (ref_entry, actual_entry) in enumerate(
+                zip(reference, timeline)
+            ):
+                if ref_entry != actual_entry:
+                    diffs.append(
+                        f"Run {run_idx} differs at tick index {i} "
+                        f"(t={ref_entry['time']}ms): "
+                        f"expected {ref_entry}, got {actual_entry}"
+                    )
+
+        return {
+            "deterministic": len(diffs) == 0,
+            "timelines":     timelines,
+            "diffs":         diffs
+        }
+
 
 def create_example_scenario():
     scenario = {
@@ -295,67 +348,83 @@ class ScenarioRunner:
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("Phase 3 - Step 8: Failure Logging Snapshot")
+    print("Phase 3 - Step 9: Deterministic Replay")
     print("=" * 60)
 
     from st_parser import parse_st
 
-    logic_interlock = [
-        {"type": "interlock", "run": "X0", "stop": "X2", "set": "Y0"}
+    # -------------------------------------------------------
+    # Scenario: jam detection with TON delay — exercises
+    # timers, wiring callbacks, and event injection together.
+    # A non-deterministic system would diverge on re-runs.
+    # -------------------------------------------------------
+    logic = [
+        {"type": "ton", "id": "T0", "if": "X0", "pt": 0.3, "set": "Y0"},
+        {"type": "interlock", "run": "Y0", "stop": "X2", "set": "Y1"}
     ]
 
-    def wiring_jam(plc, loom, t):
-        if t >= 400:
+    def wiring_replay(plc, loom, t):
+        if t >= 500:
             loom.jam_detected = True
         plc.inputs["X2"] = loom.jam_detected
 
-    # -------------------------------------------------------
-    # Scenario A: PASS — correct expectations, no snapshots
-    # -------------------------------------------------------
-    scenario_pass = {
-        "name": "Jam Stop - Correct Expectations (PASS)",
+    scenario = {
+        "name": "Deterministic Replay Test",
         "initial_inputs": {"X0": True, "X2": False},
-        "events": [],
-        "expected": [
-            {"time": 300, "outputs": {"Y0": True}},
-            {"time": 500, "outputs": {"Y0": False}}
-        ]
+        "events": [
+            {"time": 200, "inputs": {"X0": False}},   # stop timer briefly
+            {"time": 400, "inputs": {"X0": True}}     # restart timer
+        ],
+        "expected": []   # no assertions needed — replay itself is the test
     }
 
-    # -------------------------------------------------------
-    # Scenario B: FAIL — wrong expectations, snapshots captured
-    # -------------------------------------------------------
-    scenario_fail = {
-        "name": "Jam Stop - Wrong Expectations (FAIL)",
-        "initial_inputs": {"X0": True, "X2": False},
-        "events": [],
-        "expected": [
-            # Wrong: motor should be True at 300ms, not False
-            {"time": 300, "outputs": {"Y0": False}},
-            # Wrong: motor should be False at 500ms, not True
-            {"time": 500, "outputs": {"Y0": True}},
-            # Out of range: no data at 2000ms
-            {"time": 2000, "outputs": {"Y0": False}}
-        ]
-    }
+    harness = TestHarness()
+    harness.load_scenario(scenario)
 
-    entries = [
-        {"scenario": scenario_pass, "logic": logic_interlock,
-         "wiring": wiring_jam, "max_time_ms": 700, "step_ms": 100},
-        {"scenario": scenario_fail, "logic": logic_interlock,
-         "wiring": wiring_jam, "max_time_ms": 700, "step_ms": 100},
+    import io, sys
+
+    # Suppress per-tick output during replay (keep output clean)
+    old_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+
+    result = harness.replay_verify(
+        runs=3,
+        max_time_ms=900,
+        step_ms=100,
+        logic=logic,
+        wiring=wiring_replay
+    )
+
+    sys.stdout = old_stdout
+
+    # --- Report ---
+    status = "DETERMINISTIC" if result["deterministic"] else "NON-DETERMINISTIC"
+    print(f"\n  Replay result: [{status}]")
+    print(f"  Runs executed: {len(result['timelines'])}")
+    print(f"  Ticks per run: {len(result['timelines'][0])}")
+
+    if result["diffs"]:
+        print("\n  DIFFERENCES FOUND:")
+        for d in result["diffs"]:
+            print(f"    {d}")
+    else:
+        print("  All runs produced identical output timelines.")
+
+    # --- Side-by-side spot check: show tick 5 from each run ---
+    print("\n  Spot-check: tick index 5 across all runs")
+    for i, tl in enumerate(result["timelines"], 1):
+        entry = tl[5]
+        print(f"    Run {i} | t={entry['time']}ms | "
+              f"inputs={entry['inputs']} | outputs={entry['outputs']}")
+
+    # --- Verify assertion engine still works on replayed timeline ---
+    print("\n  Assertion check on final replay timeline:")
+    harness.output_timeline = result["timelines"][-1]
+    harness.scenario["expected"] = [
+        {"time": 400, "outputs": {"Y0": False}},  # timer reset, not yet fired
+        {"time": 800, "outputs": {"Y1": False}}   # jam active, Y1 interlocked off
     ]
-
-    runner = ScenarioRunner(verbose=False)
-    runner.run_all(entries)
-    runner.print_summary()
-
-    # --- Print failure snapshots for any failed scenario ---
-    print()
-    for result in runner.results:
-        if not result["passed"]:
-            print(f"  Failure snapshots for: '{result['name']}'")
-            harness_tmp = TestHarness()
-            harness_tmp.loom = LoomState()  # dummy loom for print helper
-            harness_tmp.print_failure_snapshots(result["snapshots"])
-            print()
+    assertion = harness.assert_expected()
+    print(f"  Result: {'PASS' if assertion['passed'] else 'FAIL'}")
+    for err in assertion["errors"]:
+        print(f"  ERROR: {err}")
