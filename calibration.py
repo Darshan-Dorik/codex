@@ -320,21 +320,141 @@ def print_measurements(measurements, profile_name=""):
         print(f"    {key:<30} : {display}")
 
 
+# ---------------------------------------------------------------------------
+# STEP 3: Error Calculation
+# ---------------------------------------------------------------------------
+
+def calculate_errors(measured, expected):
+    """
+    Compare measured values against expected (real-world) values.
+
+    For each key present in both dicts, computes:
+      - absolute_error : |measured - expected|
+      - relative_error : |measured - expected| / expected  (as %)
+      - within_tolerance: bool (True if abs_error <= tolerance)
+
+    Args:
+        measured : dict — output of measure_twin()
+        expected : dict — target values from real-world observations
+                   e.g. {"motor_start_delay_ms": 280, "cycle_time_ms": 3500}
+
+    Returns:
+        dict keyed by measurement name:
+        {
+          "<key>": {
+            "measured":          float | None,
+            "expected":          float,
+            "absolute_error":    float | None,
+            "relative_error_pct": float | None,
+          }
+        }
+    """
+    errors = {}
+
+    for key, exp_val in expected.items():
+        meas_val = measured.get(key)
+
+        if meas_val is None or exp_val is None:
+            errors[key] = {
+                "measured":           meas_val,
+                "expected":           exp_val,
+                "absolute_error":     None,
+                "relative_error_pct": None,
+            }
+            continue
+
+        abs_err = abs(meas_val - exp_val)
+        rel_err = round(abs_err / exp_val * 100, 2) if exp_val != 0 else None
+
+        errors[key] = {
+            "measured":           meas_val,
+            "expected":           exp_val,
+            "absolute_error":     abs_err,
+            "relative_error_pct": rel_err,
+        }
+
+    return errors
+
+
+def total_error_score(errors):
+    """
+    Compute a single scalar error score from an error dict.
+
+    Score = mean of all relative_error_pct values (ignoring None).
+    Lower is better. Returns None if no valid errors.
+    """
+    values = [
+        e["relative_error_pct"]
+        for e in errors.values()
+        if e["relative_error_pct"] is not None
+    ]
+    if not values:
+        return None
+    return round(sum(values) / len(values), 2)
+
+
+def print_errors(errors, title="Error Report"):
+    """Print error comparison in a readable table."""
+    print(f"  {title}:")
+    print(f"  {'Parameter':<30}  {'Expected':>10}  {'Measured':>10}  "
+          f"{'AbsErr':>8}  {'RelErr%':>8}")
+    print("  " + "-" * 72)
+    for key, e in errors.items():
+        exp  = f"{e['expected']}"  if e['expected']  is not None else "N/A"
+        meas = f"{e['measured']}"  if e['measured']  is not None else "N/A"
+        aerr = f"{e['absolute_error']}" if e['absolute_error'] is not None else "N/A"
+        rerr = f"{e['relative_error_pct']}%" if e['relative_error_pct'] is not None else "N/A"
+        print(f"  {key:<30}  {exp:>10}  {meas:>10}  {aerr:>8}  {rerr:>8}")
+    score = total_error_score(errors)
+    print(f"  {'':30}  {'':>10}  {'':>10}  {'':>8}  {'Score':>8}")
+    print(f"  {'Mean relative error':30}  {'':>10}  {'':>10}  {'':>8}  "
+          f"{f'{score}%' if score is not None else 'N/A':>8}")
+
+
 if __name__ == "__main__":
     print("=" * 60)
-    print("Phase 9 - Step 2: Measurement Functions")
+    print("Phase 9 - Step 3: Error Calculation")
     print("=" * 60)
 
-    # --- Test 1: measure default profile ---
-    print("\nTest 1 — Measure default profile:")
-    m1 = measure_twin(DEFAULT_PROFILE, step_ms=100)
-    print_measurements(m1, "default")
+    # Simulated "real-world" observations — slightly different from defaults
+    # (as if the real machine runs a bit faster and has a shorter startup)
+    REAL_WORLD = {
+        "motor_start_delay_ms":      280,   # real: 280ms, sim: 300ms
+        "motor_stop_delay_ms":       190,   # real: 190ms, sim: 200ms
+        "cycle_time_ms":             3500,  # real: 3500ms, sim: 3600ms
+        "sensor_trigger_time_ms":    1650,  # real: 1650ms, sim: 1700ms
+        "sensor_active_duration_ms": 195,   # real: 195ms,  sim: 200ms
+    }
 
-    # --- Test 2: measure fast profile (different speed) ---
-    print("\nTest 2 — Measure fast profile (speed=200, startup=150ms):")
+    # -------------------------------------------------------
+    # Test 1: default profile vs real world
+    # -------------------------------------------------------
+    print("\nTest 1 — Default profile vs real-world observations:")
+    measured1 = measure_twin(DEFAULT_PROFILE, step_ms=100)
+    print_measurements(measured1, "default")
+
+    errors1 = calculate_errors(measured1, REAL_WORLD)
+    print()
+    print_errors(errors1, "Default vs Real-World")
+    score1 = total_error_score(errors1)
+    print(f"\n  Total error score: {score1}%")
+
+    # -------------------------------------------------------
+    # Test 2: perfect match (measured == expected)
+    # -------------------------------------------------------
+    print("\nTest 2 — Perfect match (measured == expected):")
+    perfect_measured = dict(REAL_WORLD)
+    errors_perfect = calculate_errors(perfect_measured, REAL_WORLD)
+    print_errors(errors_perfect, "Perfect Match")
+    score_perfect = total_error_score(errors_perfect)
+    print(f"\n  Total error score: {score_perfect}%")
+
+    # -------------------------------------------------------
+    # Test 3: large mismatch
+    # -------------------------------------------------------
+    print("\nTest 3 — Large mismatch (fast profile vs real-world):")
     fast_profile = {
-        "name": "fast",
-        "description": "Fast loom",
+        "name": "fast", "description": "Fast",
         "parameters": {
             "motor":   {"startup_delay_ms": 150, "stop_delay_ms": 100},
             "shuttle": {"speed_units_per_sec": 200.0, "cycle_length": 360.0},
@@ -342,56 +462,39 @@ if __name__ == "__main__":
                         "delay_ms": 0, "miss_every_n": 0}
         }
     }
-    m2 = measure_twin(fast_profile, step_ms=100)
-    print_measurements(m2, "fast")
+    measured3 = measure_twin(fast_profile, step_ms=100)
+    errors3 = calculate_errors(measured3, REAL_WORLD)
+    print_errors(errors3, "Fast Profile vs Real-World")
+    score3 = total_error_score(errors3)
+    print(f"\n  Total error score: {score3}%")
 
-    # --- Test 3: measure with sensor delay ---
-    print("\nTest 3 — Measure with 200ms sensor delay:")
-    delayed_profile = {
-        "name": "delayed_sensor",
-        "description": "Sensor with 200ms delay",
-        "parameters": {
-            "motor":   {"startup_delay_ms": 300, "stop_delay_ms": 200},
-            "shuttle": {"speed_units_per_sec": 100.0, "cycle_length": 360.0},
-            "sensor":  {"threshold": 180.0, "window": 20.0,
-                        "delay_ms": 200, "miss_every_n": 0}
-        }
-    }
-    m3 = measure_twin(delayed_profile, step_ms=100)
-    print_measurements(m3, "delayed_sensor")
-
-    # --- Assertions ---
+    # -------------------------------------------------------
+    # Assertions
+    # -------------------------------------------------------
     print("\n--- Assertions ---")
 
-    # Default profile: motor start = 300ms, stop = 200ms
-    assert m1["motor_start_delay_ms"] == 300, \
-        f"expected 300ms start delay, got {m1['motor_start_delay_ms']}"
-    assert m1["motor_stop_delay_ms"]  == 200, \
-        f"expected 200ms stop delay, got {m1['motor_stop_delay_ms']}"
-    print(f"  PASS — default: start={m1['motor_start_delay_ms']}ms "
-          f"stop={m1['motor_stop_delay_ms']}ms")
+    # Perfect match → all errors = 0
+    for key, e in errors_perfect.items():
+        assert e["absolute_error"] == 0,    f"perfect: {key} abs_error must be 0"
+        assert e["relative_error_pct"] == 0.0
+    assert score_perfect == 0.0
+    print("  PASS — perfect match: all errors = 0, score = 0.0%")
 
-    # Default: cycle_time = cycle_length / speed = 360/100 = 3600ms
-    assert m1["cycle_time_ms"] == 3600, \
-        f"expected 3600ms cycle, got {m1['cycle_time_ms']}"
-    print(f"  PASS — default: cycle_time={m1['cycle_time_ms']}ms")
+    # Default vs real: errors are small but non-zero
+    assert errors1["motor_start_delay_ms"]["absolute_error"] == 20
+    assert errors1["cycle_time_ms"]["absolute_error"] == 100
+    assert score1 > 0.0
+    print(f"  PASS — default vs real: motor_start abs_err=20ms, "
+          f"cycle abs_err=100ms, score={score1}%")
 
-    # Fast profile: start delay rounds up to next tick (150ms → 200ms at 100ms steps)
-    # cycle=360/200=1800ms
-    assert m2["motor_start_delay_ms"] == 200, \
-        f"expected 200ms (150ms rounds up to 100ms tick), got {m2['motor_start_delay_ms']}"
-    assert m2["cycle_time_ms"] == 1800, \
-        f"expected 1800ms cycle, got {m2['cycle_time_ms']}"
-    print(f"  PASS — fast: start={m2['motor_start_delay_ms']}ms "
-          f"(150ms delay, 100ms ticks) cycle={m2['cycle_time_ms']}ms")
+    # Fast profile has larger errors than default
+    assert score3 > score1, \
+        f"fast profile must have larger error than default: {score3} vs {score1}"
+    print(f"  PASS — fast profile error ({score3}%) > default error ({score1}%)")
 
-    # Delayed sensor: trigger time should be > default trigger time
-    assert m3["sensor_trigger_time_ms"] > m1["sensor_trigger_time_ms"], \
-        "delayed sensor must trigger later than no-delay sensor"
-    print(f"  PASS — delayed sensor triggers later: "
-          f"{m3['sensor_trigger_time_ms']}ms vs {m1['sensor_trigger_time_ms']}ms")
-
-    # All measurements must be non-None
-    for key, val in m1.items():
-        assert val is not None, f"default: {key} must be measured"
-    print("  PASS — all measurements observed for default profile")
+    # All error entries have required keys
+    for key, e in errors1.items():
+        for field in ("measured", "expected", "absolute_error",
+                      "relative_error_pct"):
+            assert field in e, f"missing field {field} in {key}"
+    print("  PASS — all error entries have required fields")
