@@ -22,8 +22,13 @@ class PLC:
         self.outputs = {}
         self.logic = []
         self.timers = {}
+        self.last_scan_time_ms = 0
 
-    def scan(self, dt=0.1):
+    def scan(self, current_time_ms):
+        # Calculate delta time in seconds for timers
+        dt_seconds = (current_time_ms - self.last_scan_time_ms) / 1000.0
+        self.last_scan_time_ms = current_time_ms
+        
         # 1. Take input snapshot
         input_snapshot = dict(self.inputs)
         
@@ -56,7 +61,7 @@ class PLC:
                     self.timers[timer_id] = TON(pt)
                 
                 in_state = input_snapshot.get(condition_var, False)
-                timer_q = self.timers[timer_id].update(in_state, dt)
+                timer_q = self.timers[timer_id].update(in_state, dt_seconds)
                 output_buffer[target_var] = timer_q
             elif rule.get("type") == "interlock":
                 run_cond = rule.get("run")
@@ -71,26 +76,25 @@ class PLC:
         self.outputs = output_buffer
 
 if __name__ == "__main__":
-    print("Phase 2 - Step 2: Output Buffer Isolation Test\n")
+    import sys
+    import os
+    # Add current dir to path to import clock
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    from clock import SimulationClock
+    
+    print("Phase 2 - Step 4: Time-Aware PLC Scan Test\n")
     
     plc = PLC()
+    clock = SimulationClock()
     
-    # Multiple rules writing to the same output (Y0)
-    plc.logic = [
-        {"type": "assign", "if": "X0", "set": "Y0"}, # Rule A
-        {"type": "assign", "if": "X1", "set": "Y0"}  # Rule B (executes last)
-    ]
+    print(f"Initial PLC last_scan_time: {plc.last_scan_time_ms} ms")
     
-    # Case 1: X0=True, X1=False -> Y0 should be False
-    plc.inputs["X0"] = True
-    plc.inputs["X1"] = False
-    plc.scan()
-    print(f"Test 1 Inputs: X0={plc.inputs['X0']}, X1={plc.inputs['X1']}")
-    print(f"Test 1 Outputs: Y0={plc.outputs.get('Y0')} (Expected: False)")
+    clock.advance(100)
+    print(f"\nAdvancing clock by 100 ms -> Clock Time: {clock.get_time()} ms")
+    plc.scan(clock.get_time())
+    print(f"PLC last_scan_time updated to: {plc.last_scan_time_ms} ms")
     
-    # Case 2: X0=False, X1=True -> Y0 should be True
-    plc.inputs["X0"] = False
-    plc.inputs["X1"] = True
-    plc.scan()
-    print(f"\nTest 2 Inputs: X0={plc.inputs['X0']}, X1={plc.inputs['X1']}")
-    print(f"Test 2 Outputs: Y0={plc.outputs.get('Y0')} (Expected: True)")
+    clock.advance(50)
+    print(f"\nAdvancing clock by 50 ms -> Clock Time: {clock.get_time()} ms")
+    plc.scan(clock.get_time())
+    print(f"PLC last_scan_time updated to: {plc.last_scan_time_ms} ms")
