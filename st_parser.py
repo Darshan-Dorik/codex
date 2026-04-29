@@ -112,81 +112,143 @@ def parse_condition(condition_str):
 # ---------------------------------------------------------------------------
 # Original simple parser — preserved for backward compatibility
 # Now delegates condition parsing to parse_condition()
+# Supports: IF/THEN/END_IF  and  IF/THEN/ELSE/END_IF
 # ---------------------------------------------------------------------------
+
+def _parse_assignment(stmt):
+    """
+    Parse a single assignment statement: '<var> := TRUE|FALSE ;'
+    Returns a dict or None if the statement doesn't match.
+    """
+    stmt = stmt.strip()
+    m = re.match(r'^([A-Za-z_][A-Za-z0-9_]*)\s*:=\s*(TRUE|FALSE)\s*;?$',
+                 stmt, re.IGNORECASE)
+    if not m:
+        return None
+    return {
+        "type":   "set",
+        "target": m.group(1).upper(),
+        "value":  m.group(2).upper() == "TRUE"
+    }
+
+
+def _parse_body(body_str):
+    """
+    Parse a THEN or ELSE body string into a list of assignment dicts.
+    Each statement is separated by ';'.
+    """
+    statements = []
+    # Split on semicolons, strip whitespace, skip empty
+    for stmt in body_str.split(";"):
+        stmt = stmt.strip()
+        if not stmt:
+            continue
+        parsed = _parse_assignment(stmt + ";")
+        if parsed:
+            statements.append(parsed)
+    return statements
+
 
 def parse_st(st_code):
     """
-    Parses minimal Structured Text:
-    IF <condition> THEN <var> := TRUE/FALSE; END_IF;
+    Parses Structured Text blocks of the form:
 
-    Condition may now include AND, OR, NOT and parentheses.
-    Produces internal 'assign' rules with a structured 'condition' tree
-    instead of a plain string variable name.
+      IF <condition> THEN
+          <assignments>
+      END_IF;
+
+      IF <condition> THEN
+          <assignments>
+      ELSE
+          <assignments>
+      END_IF;
+
+    Condition may include AND, OR, NOT and parentheses.
+
+    Returns a list of rule dicts:
+      - No ELSE:  {"type": "if_else", "condition": <tree>,
+                   "then_body": [...], "else_body": []}
+      - With ELSE: {"type": "if_else", "condition": <tree>,
+                    "then_body": [...], "else_body": [...]}
     """
     logic = []
 
-    pattern = re.compile(
-        r"IF\s+(.+?)\s+THEN\s+(.+?)\s*:=\s*(TRUE|FALSE)\s*;\s*END_IF;",
+    # Match each IF...END_IF block (non-greedy, DOTALL)
+    block_pattern = re.compile(
+        r'IF\s+(.+?)\s+THEN\s+(.*?)\s*END_IF\s*;',
         re.IGNORECASE | re.DOTALL
     )
 
-    matches = pattern.findall(st_code)
-    for match in matches:
-        cond_str   = match[0].strip()
-        target_var = match[1].strip()
-        val        = match[2].strip().upper()
+    for m in block_pattern.finditer(st_code):
+        cond_str  = m.group(1).strip()
+        body_str  = m.group(2).strip()
 
-        if val == "TRUE":
-            logic.append({
-                "type":      "assign",
-                "condition": parse_condition(cond_str),
-                "set":       target_var
-            })
+        # Split body on ELSE keyword (case-insensitive, whole word)
+        else_split = re.split(r'\bELSE\b', body_str, maxsplit=1, flags=re.IGNORECASE)
+
+        then_str = else_split[0].strip()
+        else_str = else_split[1].strip() if len(else_split) == 2 else ""
+
+        logic.append({
+            "type":      "if_else",
+            "condition": parse_condition(cond_str),
+            "then_body": _parse_body(then_str),
+            "else_body": _parse_body(else_str)
+        })
 
     return logic
 
 
 if __name__ == "__main__":
-    print("Phase 4 - Step 1: Extended ST Parser — Boolean Expressions\n")
+    print("Phase 4 - Step 2: Extended ST Parser — ELSE Block\n")
 
-    # --- Test 1: simple variable (backward-compatible) ---
-    t1 = "X0"
-    print(f"Test 1 — Simple variable: '{t1}'")
-    print(json.dumps(parse_condition(t1), indent=2))
-
-    # --- Test 2: NOT ---
-    t2 = "NOT X1"
-    print(f"\nTest 2 — NOT: '{t2}'")
-    print(json.dumps(parse_condition(t2), indent=2))
-
-    # --- Test 3: AND ---
-    t3 = "X0 AND X1"
-    print(f"\nTest 3 — AND: '{t3}'")
-    print(json.dumps(parse_condition(t3), indent=2))
-
-    # --- Test 4: AND NOT (the key new case) ---
-    t4 = "X0 AND NOT X1"
-    print(f"\nTest 4 — AND NOT: '{t4}'")
-    print(json.dumps(parse_condition(t4), indent=2))
-
-    # --- Test 5: OR ---
-    t5 = "X0 OR X2"
-    print(f"\nTest 5 — OR: '{t5}'")
-    print(json.dumps(parse_condition(t5), indent=2))
-
-    # --- Test 6: complex expression with parentheses ---
-    t6 = "(X0 OR X1) AND NOT X2"
-    print(f"\nTest 6 — Complex: '{t6}'")
-    print(json.dumps(parse_condition(t6), indent=2))
-
-    # --- Test 7: full parse_st with boolean condition ---
-    print("\nTest 7 — parse_st with boolean condition:")
-    st_code = """
-    IF X0 AND NOT X1 THEN
+    # --- Test 1: IF/THEN/END_IF (no ELSE) — backward compatible ---
+    st_no_else = """
+    IF X0 THEN
         Y0 := TRUE;
     END_IF;
     """
-    print(f"  Input ST:\n{st_code.strip()}")
-    result = parse_st(st_code)
-    print("\n  Parsed logic:")
+    print("Test 1 — IF/THEN/END_IF (no ELSE):")
+    print(f"  Input: {st_no_else.strip()}")
+    result = parse_st(st_no_else)
+    print("  Parsed:")
     print(json.dumps(result, indent=2))
+
+    # --- Test 2: IF/THEN/ELSE/END_IF ---
+    st_with_else = """
+    IF X0 THEN
+        Y0 := TRUE;
+    ELSE
+        Y0 := FALSE;
+    END_IF;
+    """
+    print("\nTest 2 — IF/THEN/ELSE/END_IF:")
+    print(f"  Input: {st_with_else.strip()}")
+    result2 = parse_st(st_with_else)
+    print("  Parsed:")
+    print(json.dumps(result2, indent=2))
+
+    # --- Test 3: ELSE with boolean condition ---
+    st_bool_else = """
+    IF X0 AND NOT X1 THEN
+        Y0 := TRUE;
+    ELSE
+        Y0 := FALSE;
+    END_IF;
+    """
+    print("\nTest 3 — Boolean condition + ELSE:")
+    print(f"  Input: {st_bool_else.strip()}")
+    result3 = parse_st(st_bool_else)
+    print("  Parsed:")
+    print(json.dumps(result3, indent=2))
+
+    # --- Structural verification ---
+    print("\n--- Structural Verification ---")
+    r = result2[0]
+    assert r["type"]      == "if_else",                    "type must be if_else"
+    assert r["condition"] == {"op": "VAR", "name": "X0"},  "condition must be VAR X0"
+    assert len(r["then_body"]) == 1,                       "then_body must have 1 statement"
+    assert len(r["else_body"]) == 1,                       "else_body must have 1 statement"
+    assert r["then_body"][0] == {"type": "set", "target": "Y0", "value": True},  "then sets Y0=True"
+    assert r["else_body"][0] == {"type": "set", "target": "Y0", "value": False}, "else sets Y0=False"
+    print("  All structural assertions passed.")
