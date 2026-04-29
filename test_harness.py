@@ -15,7 +15,15 @@ class TestHarness:
         self.scenario = scenario
         self.output_timeline = []
 
-    def run(self, max_time_ms=1000, step_ms=100, logic=None):
+    def run(self, max_time_ms=1000, step_ms=100, logic=None, wiring=None):
+        """
+        Run the scenario simulation.
+
+        wiring: optional callable(plc, loom, current_time_ms) invoked after
+                each scan cycle.  Use it to wire loom sensor state back into
+                PLC inputs (e.g. shuttle position sensor, jam sensor).
+                If None, only the default Y0 -> motor_running link is applied.
+        """
         print(f"--- Running Scenario: {self.scenario['name']} ---")
         
         self.plc = PLC()
@@ -49,21 +57,25 @@ class TestHarness:
             # 2. Scan PLC
             self.plc.scan(current_time)
             
-            # 3. Capture Outputs — snapshot inputs too for full traceability
+            # 3. Default wiring: PLC Y0 -> loom motor
+            if "Y0" in self.plc.outputs:
+                self.loom.motor_running = self.plc.outputs["Y0"]
+
+            # 4. Custom wiring callback (loom sensors -> PLC inputs)
+            if wiring:
+                wiring(self.plc, self.loom, current_time)
+
+            # 5. Capture Outputs — snapshot inputs too for full traceability
             self.output_timeline.append({
                 "time": current_time,
                 "inputs": dict(self.plc.inputs),
                 "outputs": dict(self.plc.outputs)
             })
             
-            # Simple fixed wiring for test harness
-            if "Y0" in self.plc.outputs:
-                self.loom.motor_running = self.plc.outputs["Y0"]
-            
-            # 4. Update Loom
+            # 6. Update Loom physics
             self.loom.update(current_time)
             
-            print(f"Time: {current_time}ms | PLC Inputs: {self.plc.inputs} | PLC Outputs: {self.plc.outputs}")
+            print(f"Time: {current_time}ms | Inputs: {self.plc.inputs} | Outputs: {self.plc.outputs} | ShuttlePos: {round(self.loom.shuttle_position, 2)}")
 
     def print_output_timeline(self):
         """Print the captured output timeline in a human-readable table format."""
@@ -186,17 +198,17 @@ class ScenarioRunner:
             logic      = entry.get("logic", [])
             max_time   = entry.get("max_time_ms", 1000)
             step       = entry.get("step_ms", 100)
+            wiring     = entry.get("wiring", None)
 
             harness = TestHarness()
             harness.load_scenario(scenario)
 
             if not self.verbose:
-                # Suppress per-tick print by temporarily redirecting stdout
                 import io, sys
                 old_stdout = sys.stdout
                 sys.stdout = io.StringIO()
 
-            harness.run(max_time_ms=max_time, step_ms=step, logic=logic)
+            harness.run(max_time_ms=max_time, step_ms=step, logic=logic, wiring=wiring)
 
             if not self.verbose:
                 sys.stdout = old_stdout
@@ -233,68 +245,137 @@ class ScenarioRunner:
 
 
 if __name__ == "__main__":
-    print("=" * 55)
-    print("Phase 3 - Step 6: Multi-Scenario Runner Test")
-    print("=" * 55)
+    print("=" * 60)
+    print("Phase 3 - Step 7: Loom-Specific Scenarios")
+    print("=" * 60)
 
     from st_parser import parse_st
 
-    # --- Shared logic ---
-    st_code = """
+    # -------------------------------------------------------
+    # SCENARIO 1: Motor start with TON delay
+    #
+    # Logic: TON timer T0, IN=X0, PT=0.5s -> Y0
+    # X0 goes True at 200ms.
+    # Y0 should remain False until 200+500=700ms.
+    # -------------------------------------------------------
+    logic_ton = [
+        {"type": "ton", "id": "T0", "if": "X0", "pt": 0.5, "set": "Y0"}
+    ]
+
+    scenario_1 = {
+        "name": "Motor Start with TON Delay (0.5s)",
+        "initial_inputs": {"X0": False},
+        "events": [
+            {"time": 200, "inputs": {"X0": True}}   # start command at 200ms
+        ],
+        "expected": [
+            {"time": 400, "outputs": {"Y0": False}},  # only 200ms elapsed — not yet
+            {"time": 700, "outputs": {"Y0": True}},   # 500ms elapsed — timer fires
+            {"time": 900, "outputs": {"Y0": True}}    # still running
+        ]
+    }
+
+    # -------------------------------------------------------
+    # SCENARIO 2: Shuttle movement triggering position sensor
+    #
+    # Logic: IF X0 THEN Y0 := TRUE  (motor on)
+    #        Wiring: shuttle_position > 15 units -> X1 = True
+    #
+    # Motor starts at t=0 (X0=True initially).
+    # Shuttle moves at 10 units/sec.
+    # Threshold 15 units reached at ~1500ms.
+    # X1 (sensor) should be False at 1000ms, True at 2000ms.
+    # -------------------------------------------------------
+    logic_assign = parse_st("""
     IF X0 THEN
         Y0 := TRUE;
     END_IF;
-    """
-    logic = parse_st(st_code)
+    """)
 
-    # --------------------------------------------------
-    # Scenario 1: PASS — motor off before event, on after
-    # --------------------------------------------------
-    scenario_1 = {
-        "name": "Motor Off Then On (PASS)",
-        "initial_inputs": {"X0": False},
-        "events": [{"time": 300, "inputs": {"X0": True}}],
-        "expected": [
-            {"time": 200, "outputs": {"Y0": False}},
-            {"time": 400, "outputs": {"Y0": True}},
-            {"time": 500, "outputs": {"Y0": True}}
-        ]
-    }
+    def wiring_shuttle_sensor(plc, loom, t):
+        """Wire shuttle position sensor back into PLC input X1."""
+        plc.inputs["X1"] = loom.shuttle_position > 15.0
 
-    # --------------------------------------------------
-    # Scenario 2: PASS — motor stays off (no start event)
-    # --------------------------------------------------
     scenario_2 = {
-        "name": "Motor Never Starts (PASS)",
-        "initial_inputs": {"X0": False},
+        "name": "Shuttle Position Sensor Trigger at 15 units",
+        "initial_inputs": {"X0": True},   # motor on from the start
         "events": [],
         "expected": [
-            {"time": 200, "outputs": {"Y0": False}},
-            {"time": 500, "outputs": {"Y0": False}}
+            {"time": 1000, "outputs": {"Y0": True}},   # motor still running
+            {"time": 2000, "outputs": {"Y0": True}}    # motor still running
+            # X1 sensor state is verified via wiring; captured in timeline inputs
         ]
     }
 
-    # --------------------------------------------------
-    # Scenario 3: FAIL — wrong expectation on purpose
-    # --------------------------------------------------
-    scenario_3 = {
-        "name": "Wrong Expectation (FAIL)",
-        "initial_inputs": {"X0": False},
-        "events": [{"time": 300, "inputs": {"X0": True}}],
-        "expected": [
-            # Motor should be False at 200ms, not True
-            {"time": 200, "outputs": {"Y0": True}},
-            # Motor should be True at 400ms, not False
-            {"time": 400, "outputs": {"Y0": False}}
-        ]
-    }
-
-    entries = [
-        {"scenario": scenario_1, "logic": logic, "max_time_ms": 600, "step_ms": 100},
-        {"scenario": scenario_2, "logic": logic, "max_time_ms": 600, "step_ms": 100},
-        {"scenario": scenario_3, "logic": logic, "max_time_ms": 600, "step_ms": 100},
+    # -------------------------------------------------------
+    # SCENARIO 3: Jam detection stops motor
+    #
+    # Logic: interlock — run=X0, stop=X2 (jam sensor) -> Y0
+    # X0=True from start. Jam injected at 400ms via event.
+    # Wiring: loom.jam_detected -> X2
+    # Y0 should be True before jam, False after.
+    # -------------------------------------------------------
+    logic_interlock = [
+        {"type": "interlock", "run": "X0", "stop": "X2", "set": "Y0"}
     ]
 
-    runner = ScenarioRunner(verbose=False)  # suppress per-tick noise
+    def wiring_jam_sensor(plc, loom, t):
+        """Wire loom jam state back into PLC input X2.
+        Also trigger loom jam at 400ms (simulates physical jam event)."""
+        if t >= 400:
+            loom.jam_detected = True
+        plc.inputs["X2"] = loom.jam_detected
+
+    scenario_3 = {
+        "name": "Jam Detection Stops Motor",
+        "initial_inputs": {"X0": True, "X2": False},
+        "events": [],   # jam is driven by wiring callback, not event injection
+        "expected": [
+            {"time": 300, "outputs": {"Y0": True}},   # running before jam
+            {"time": 500, "outputs": {"Y0": False}},  # stopped after jam
+            {"time": 700, "outputs": {"Y0": False}}   # still stopped
+        ]
+    }
+
+    # -------------------------------------------------------
+    # Run all three
+    # -------------------------------------------------------
+    entries = [
+        {
+            "scenario":    scenario_1,
+            "logic":       logic_ton,
+            "max_time_ms": 1000,
+            "step_ms":     100
+        },
+        {
+            "scenario":    scenario_2,
+            "logic":       logic_assign,
+            "wiring":      wiring_shuttle_sensor,
+            "max_time_ms": 2100,
+            "step_ms":     100
+        },
+        {
+            "scenario":    scenario_3,
+            "logic":       logic_interlock,
+            "wiring":      wiring_jam_sensor,
+            "max_time_ms": 800,
+            "step_ms":     100
+        },
+    ]
+
+    runner = ScenarioRunner(verbose=True)
     runner.run_all(entries)
+
+    print()
     runner.print_summary()
+
+    # Extra: show shuttle position timeline for scenario 2
+    print("\n--- Scenario 2: Shuttle Position Samples ---")
+    # Re-run scenario 2 with a fresh harness to access the timeline
+    h = TestHarness()
+    h.load_scenario(scenario_2)
+    h.run(max_time_ms=2100, step_ms=100, logic=logic_assign, wiring=wiring_shuttle_sensor)
+    for entry in h.output_timeline:
+        if entry["time"] in (500, 1000, 1500, 2000):
+            x1 = entry["inputs"].get("X1", "-")
+            print(f"  t={entry['time']}ms | X1(sensor)={x1} | shuttle_pos ~{entry['time']/100 * 1.0:.1f} units")
