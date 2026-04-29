@@ -156,103 +156,133 @@ class PLC:
         # 4. Commit outputs at end
         self.outputs = output_buffer
 
+    def get_coverage_report(self):
+        """
+        Produce a structured coverage report dict.
+
+        Schema:
+          {
+            "conditions": {
+              "<label>": {
+                "true":  int,   # times condition evaluated True
+                "false": int,   # times condition evaluated False
+                "total": int,
+                "true_pct":  float,  # percentage 0-100
+                "false_pct": float
+              }
+            },
+            "branches": {
+              "<label>": {
+                "then":      int,   # times THEN branch executed
+                "else":      int,   # times ELSE branch executed
+                "total":     int,
+                "then_pct":  float,
+                "else_pct":  float,
+                "both_covered": bool  # True only if both then>0 and else>0
+              }
+            }
+          }
+        """
+        report = {"conditions": {}, "branches": {}}
+
+        for label, counts in self.coverage.items():
+            total = counts["true"] + counts["false"]
+            report["conditions"][label] = {
+                "true":      counts["true"],
+                "false":     counts["false"],
+                "total":     total,
+                "true_pct":  round(counts["true"]  / total * 100, 1) if total else 0.0,
+                "false_pct": round(counts["false"] / total * 100, 1) if total else 0.0,
+            }
+
+        for label, counts in self.branch_coverage.items():
+            total = counts["then"] + counts["else"]
+            report["branches"][label] = {
+                "then":         counts["then"],
+                "else":         counts["else"],
+                "total":        total,
+                "then_pct":     round(counts["then"] / total * 100, 1) if total else 0.0,
+                "else_pct":     round(counts["else"] / total * 100, 1) if total else 0.0,
+                "both_covered": counts["then"] > 0 and counts["else"] > 0,
+            }
+
+        return report
+
 if __name__ == "__main__":
-    import sys, os
+    import sys, os, json
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     from st_parser import parse_st
 
     print("=" * 60)
-    print("Phase 4 - Step 6: Coverage Tracking — Branches")
+    print("Phase 4 - Step 7: Coverage Report")
     print("=" * 60)
 
-    # -------------------------------------------------------
-    # Scenario A: IF/ELSE — 4 THEN, 2 ELSE
-    # -------------------------------------------------------
-    st_a = """
-    IF X0 THEN
-        Y0 := TRUE;
-    ELSE
-        Y0 := FALSE;
-    END_IF;
-    """
-    plc_a = PLC()
-    plc_a.logic = parse_st(st_a)
-
-    schedule_a = [
-        (100, {"X0": True}),   # THEN
-        (200, {"X0": False}),  # ELSE
-        (300, {"X0": True}),   # THEN
-        (400, {"X0": True}),   # THEN
-        (500, {"X0": False}),  # ELSE
-        (600, {"X0": True}),   # THEN
-    ]
-
-    print("\nScenario A — IF X0 THEN Y0:=TRUE ELSE Y0:=FALSE")
-    print(f"  {'Time':>6}  {'X0':>5}  {'Branch':>6}")
-    print("  " + "-" * 28)
-    for t, inputs in schedule_a:
-        plc_a.inputs = dict(inputs)
-        plc_a.scan(t)
-        branch = "THEN" if inputs["X0"] else "ELSE"
-        print(f"  {t:>6}ms  {str(inputs['X0']):>5}  {branch:>6}")
-
-    lbl_a = "X0"
-    print(f"\n  Branch coverage for '{lbl_a}':")
-    print(f"    THEN taken: {plc_a.branch_coverage[lbl_a]['then']}")
-    print(f"    ELSE taken: {plc_a.branch_coverage[lbl_a]['else']}")
-
-    # -------------------------------------------------------
-    # Scenario B: AND NOT condition — 3 THEN, 3 ELSE
-    # (same schedule as Step 5 to cross-verify)
-    # -------------------------------------------------------
-    st_b = """
+    # Two IF blocks in one program — each gets its own coverage entry
+    st_code = """
     IF X0 AND NOT X1 THEN
         Y0 := TRUE;
     ELSE
         Y0 := FALSE;
     END_IF;
-    """
-    plc_b = PLC()
-    plc_b.logic = parse_st(st_b)
 
-    schedule_b = [
-        (100, {"X0": True,  "X1": False}),  # THEN
-        (200, {"X0": True,  "X1": True}),   # ELSE
-        (300, {"X0": False, "X1": False}),  # ELSE
-        (400, {"X0": True,  "X1": False}),  # THEN
-        (500, {"X0": True,  "X1": False}),  # THEN
-        (600, {"X0": False, "X1": True}),   # ELSE
+    IF X2 OR X3 THEN
+        Y1 := TRUE;
+    ELSE
+        Y1 := FALSE;
+    END_IF;
+    """
+
+    plc = PLC()
+    plc.logic = parse_st(st_code)
+
+    # 8 scan cycles — exercise both conditions in different combinations
+    schedule = [
+        (100, {"X0": True,  "X1": False, "X2": False, "X3": False}),  # cond1=T, cond2=F
+        (200, {"X0": True,  "X1": True,  "X2": True,  "X3": False}),  # cond1=F, cond2=T
+        (300, {"X0": False, "X1": False, "X2": False, "X3": True}),   # cond1=F, cond2=T
+        (400, {"X0": True,  "X1": False, "X2": True,  "X3": True}),   # cond1=T, cond2=T
+        (500, {"X0": False, "X1": True,  "X2": False, "X3": False}),  # cond1=F, cond2=F
+        (600, {"X0": True,  "X1": False, "X2": False, "X3": False}),  # cond1=T, cond2=F
+        (700, {"X0": True,  "X1": True,  "X2": True,  "X3": False}),  # cond1=F, cond2=T
+        (800, {"X0": False, "X1": False, "X2": False, "X3": False}),  # cond1=F, cond2=F
     ]
 
-    print("\nScenario B — IF X0 AND NOT X1 THEN Y0:=TRUE ELSE Y0:=FALSE")
-    print(f"  {'Time':>6}  {'X0':>5}  {'X1':>5}  {'Branch':>6}")
-    print("  " + "-" * 34)
-    for t, inputs in schedule_b:
-        plc_b.inputs = dict(inputs)
-        plc_b.scan(t)
-        cond = inputs["X0"] and not inputs["X1"]
-        branch = "THEN" if cond else "ELSE"
-        print(f"  {t:>6}ms  {str(inputs['X0']):>5}  {str(inputs['X1']):>5}  {branch:>6}")
+    for t, inputs in schedule:
+        plc.inputs = dict(inputs)
+        plc.scan(t)
 
-    lbl_b = "(X0 AND NOT(X1))"
-    print(f"\n  Branch coverage for '{lbl_b}':")
-    print(f"    THEN taken: {plc_b.branch_coverage[lbl_b]['then']}")
-    print(f"    ELSE taken: {plc_b.branch_coverage[lbl_b]['else']}")
+    # --- Get structured report ---
+    report = plc.get_coverage_report()
 
-    # -------------------------------------------------------
-    # Assertions
-    # -------------------------------------------------------
-    print("\n  --- Assertions ---")
+    print("\n--- Coverage Report (JSON) ---")
+    print(json.dumps(report, indent=2))
 
-    assert plc_a.branch_coverage[lbl_a]["then"] == 4, "Scenario A: expected 4 THEN"
-    assert plc_a.branch_coverage[lbl_a]["else"] == 2, "Scenario A: expected 2 ELSE"
-    print(f"  PASS — Scenario A: then=4, else=2")
+    # --- Human-readable summary ---
+    print("\n--- Coverage Summary ---")
+    for label, data in report["conditions"].items():
+        print(f"  Condition : {label}")
+        print(f"    Evaluated TRUE  : {data['true']:>3} / {data['total']}  ({data['true_pct']}%)")
+        print(f"    Evaluated FALSE : {data['false']:>3} / {data['total']}  ({data['false_pct']}%)")
 
-    assert plc_b.branch_coverage[lbl_b]["then"] == 3, "Scenario B: expected 3 THEN"
-    assert plc_b.branch_coverage[lbl_b]["else"] == 3, "Scenario B: expected 3 ELSE"
-    print(f"  PASS — Scenario B: then=3, else=3")
+    print()
+    for label, data in report["branches"].items():
+        covered = "FULL" if data["both_covered"] else "PARTIAL"
+        print(f"  Branch    : {label}  [{covered}]")
+        print(f"    THEN taken : {data['then']:>3} / {data['total']}  ({data['then_pct']}%)")
+        print(f"    ELSE taken : {data['else']:>3} / {data['total']}  ({data['else_pct']}%)")
 
-    # Verify branch_coverage and coverage stay in sync
-    assert plc_b.branch_coverage[lbl_b]["then"] == plc_b.coverage[lbl_b]["true"]
-    assert plc_b.branch_coverage[lbl_b]["else"] == plc_b.coverage[lbl_b]["false"]
-    print(f"  PASS — branch_coverage and coverage counts are consistent")
+    # --- Assertions ---
+    print("\n--- Assertions ---")
+    lbl1 = "(X0 AND NOT(X1))"
+    lbl2 = "(X2 OR X3)"
+
+    assert lbl1 in report["conditions"],                        f"Missing condition: {lbl1}"
+    assert lbl2 in report["conditions"],                        f"Missing condition: {lbl2}"
+    assert report["conditions"][lbl1]["true"]  == 3,            "cond1 true count"
+    assert report["conditions"][lbl1]["false"] == 5,            "cond1 false count"
+    assert report["conditions"][lbl2]["true"]  == 4,            "cond2 true count"
+    assert report["conditions"][lbl2]["false"] == 4,            "cond2 false count"
+    assert report["branches"][lbl1]["both_covered"] is True,    "cond1 both branches covered"
+    assert report["branches"][lbl2]["both_covered"] is True,    "cond2 both branches covered"
+    print("  PASS — all condition and branch counts correct")
+    print("  PASS — both conditions have full branch coverage")
