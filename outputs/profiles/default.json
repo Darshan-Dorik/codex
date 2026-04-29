@@ -1,0 +1,20 @@
+{
+  "name": "default",
+  "description": "Default parameters matching twin constructor defaults",
+  "parameters": {
+    "motor": {
+      "startup_delay_ms": 300,
+      "stop_delay_ms": 200
+    },
+    "shuttle": {
+      "speed_units_per_sec": 100.0,
+      "cycle_length": 360.0
+    },
+    "sensor": {
+      "threshold": 180.0,
+      "window": 20.0,
+      "delay_ms": 0,
+      "miss_every_n": 0
+    }
+  }
+}

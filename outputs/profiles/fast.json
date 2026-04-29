@@ -1,0 +1,20 @@
+{
+  "name": "fast",
+  "description": "Fast loom (light fabric)",
+  "parameters": {
+    "motor": {
+      "startup_delay_ms": 150,
+      "stop_delay_ms": 100
+    },
+    "shuttle": {
+      "speed_units_per_sec": 200.0,
+      "cycle_length": 360.0
+    },
+    "sensor": {
+      "threshold": 180.0,
+      "window": 20.0,
+      "delay_ms": 0,
+      "miss_every_n": 0
+    }
+  }
+}

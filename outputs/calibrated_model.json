@@ -1,0 +1,71 @@
+{
+  "profile": {
+    "name": "calibrated_default",
+    "description": "Default profile after iterative calibration",
+    "parameters": {
+      "motor": {
+        "startup_delay_ms": 300,
+        "stop_delay_ms": 200
+      },
+      "shuttle": {
+        "speed_units_per_sec": 102.8571,
+        "cycle_length": 360.0
+      },
+      "sensor": {
+        "threshold": 180.0,
+        "window": 20.0,
+        "delay_ms": 0,
+        "miss_every_n": 0
+      }
+    }
+  },
+  "report": {
+    "profile_name": "calibrated_default",
+    "score": 3.6,
+    "parameters": [
+      {
+        "parameter": "motor_start_delay_ms",
+        "expected": 280,
+        "simulated": 300,
+        "error": 20,
+        "error_pct": 7.14
+      },
+      {
+        "parameter": "motor_stop_delay_ms",
+        "expected": 190,
+        "simulated": 200,
+        "error": 10,
+        "error_pct": 5.26
+      },
+      {
+        "parameter": "cycle_time_ms",
+        "expected": 3500,
+        "simulated": 3500,
+        "error": 0,
+        "error_pct": 0.0
+      },
+      {
+        "parameter": "sensor_trigger_time_ms",
+        "expected": 1650,
+        "simulated": 1700,
+        "error": 50,
+        "error_pct": 3.03
+      },
+      {
+        "parameter": "sensor_active_duration_ms",
+        "expected": 195,
+        "simulated": 200,
+        "error": 5,
+        "error_pct": 2.56
+      }
+    ]
+  },
+  "expected": {
+    "motor_start_delay_ms": 280,
+    "motor_stop_delay_ms": 190,
+    "cycle_time_ms": 3500,
+    "sensor_trigger_time_ms": 1650,
+    "sensor_active_duration_ms": 195
+  },
+  "step_ms": 100
+}

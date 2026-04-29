@@ -1,0 +1,52 @@
+{
+  "initial_profile": "default",
+  "calibrated_profile": "calibrated",
+  "initial_score": 4.17,
+  "calibrated_score": 3.6,
+  "improvement": 0.57,
+  "rating": "GOOD",
+  "parameter_improvements": [
+    {
+      "parameter": "motor_start_delay_ms",
+      "initial_error_pct": 7.14,
+      "calibrated_error_pct": 7.14,
+      "improvement_pct": 0.0
+    },
+    {
+      "parameter": "motor_stop_delay_ms",
+      "initial_error_pct": 5.26,
+      "calibrated_error_pct": 5.26,
+      "improvement_pct": 0.0
+    },
+    {
+      "parameter": "cycle_time_ms",
+      "initial_error_pct": 2.86,
+      "calibrated_error_pct": 0.0,
+      "improvement_pct": 2.86
+    },
+    {
+      "parameter": "sensor_trigger_time_ms",
+      "initial_error_pct": 3.03,
+      "calibrated_error_pct": 3.03,
+      "improvement_pct": 0.0
+    },
+    {
+      "parameter": "sensor_active_duration_ms",
+      "initial_error_pct": 2.56,
+      "calibrated_error_pct": 2.56,
+      "improvement_pct": 0.0
+    }
+  ],
+  "drift": {
+    "drifted": false,
+    "threshold": 5.0,
+    "drifts": [],
+    "stable": [
+      "motor_start_delay_ms",
+      "motor_stop_delay_ms",
+      "cycle_time_ms",
+      "sensor_trigger_time_ms",
+      "sensor_active_duration_ms"
+    ]
+  }
+}
