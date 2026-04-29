@@ -71,22 +71,26 @@ class PLC:
         self.outputs = output_buffer
 
 if __name__ == "__main__":
-    print("Phase 2 - Step 1: Deterministic Scan Cycle Test\n")
+    print("Phase 2 - Step 2: Output Buffer Isolation Test\n")
     
     plc = PLC()
     
-    # We add a dummy rule that modifies the raw `inputs` dictionary mid-scan
-    # to simulate a physical hardware interrupt or async state change.
+    # Multiple rules writing to the same output (Y0)
     plc.logic = [
-        {"id": "mid_scan_changer"}, 
-        {"type": "assign", "if": "X0", "set": "Y0"} 
+        {"type": "assign", "if": "X0", "set": "Y0"}, # Rule A
+        {"type": "assign", "if": "X1", "set": "Y0"}  # Rule B (executes last)
     ]
     
+    # Case 1: X0=True, X1=False -> Y0 should be False
     plc.inputs["X0"] = True
-    print(f"Initial physical inputs: {plc.inputs}")
-    print("Running scan cycle...")
+    plc.inputs["X1"] = False
     plc.scan()
+    print(f"Test 1 Inputs: X0={plc.inputs['X0']}, X1={plc.inputs['X1']}")
+    print(f"Test 1 Outputs: Y0={plc.outputs.get('Y0')} (Expected: False)")
     
-    print(f"\nFinal physical inputs: {plc.inputs}")
-    print(f"Final PLC Outputs: {plc.outputs}")
-    print("Expected result: Y0 is True because the snapshot was taken BEFORE the mid-scan change.")
+    # Case 2: X0=False, X1=True -> Y0 should be True
+    plc.inputs["X0"] = False
+    plc.inputs["X1"] = True
+    plc.scan()
+    print(f"\nTest 2 Inputs: X0={plc.inputs['X0']}, X1={plc.inputs['X1']}")
+    print(f"Test 2 Outputs: Y0={plc.outputs.get('Y0')} (Expected: True)")
