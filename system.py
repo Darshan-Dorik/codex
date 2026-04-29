@@ -95,5 +95,40 @@ def test_step8():
         y0 = plc.outputs.get("Y0")
         print(f"Time: {time_elapsed}s | Jam: {loom.jam_detected} | PLC Y0: {y0} | Shuttle Pos: {pos}")
 
+from logger import SystemLogger
+
+def test_step9():
+    plc = PLC()
+    loom = LoomState()
+    logger = SystemLogger()
+    
+    plc.logic = [
+        {"type": "interlock", "run": "X0", "stop": "X2", "set": "Y0"}
+    ]
+    
+    print("\nTesting Step 9: Structured Logging System")
+    
+    plc.inputs["X0"] = True
+    plc.inputs["X2"] = False
+    
+    for i in range(5): # Simulate just 5 cycles to keep logs readable
+        if i == 3:
+            loom.jam_detected = True
+            
+        if loom.jam_detected:
+            plc.inputs["X2"] = True
+            
+        plc.scan(dt=0.1)
+        loom.motor_running = plc.outputs.get("Y0", False)
+        loom.update(dt=0.1)
+        
+        time_elapsed = round((i + 1) * 0.1, 1)
+        
+        # Log the state
+        logger.log_cycle(time_elapsed, plc.inputs, plc.outputs, loom)
+        
+    print("\n--- Structured Logs ---")
+    logger.print_logs()
+
 if __name__ == "__main__":
-    test_step8()
+    test_step9()
