@@ -32,5 +32,29 @@ def test_step6():
     loom.update(dt=0.1)
     print(f"Loom Shuttle Pos after 0.1s: {loom.shuttle_position:.1f}")
 
+def test_step7():
+    plc = PLC()
+    loom = LoomState()
+    
+    print("\nTesting Step 7: Connect Loom -> PLC Inputs")
+    print("Simulating shuttle position crossing threshold (15.0)\n")
+    
+    threshold = 15.0
+    loom.motor_running = True
+    
+    for i in range(20): # Simulate 2.0 seconds
+        loom.update(dt=0.1)
+        
+        # Connect Loom -> PLC Input
+        if loom.shuttle_position > threshold:
+            plc.inputs["X1"] = True
+        else:
+            plc.inputs["X1"] = False
+            
+        time_elapsed = round((i + 1) * 0.1, 1)
+        pos = round(loom.shuttle_position, 1)
+        x1 = plc.inputs.get("X1", False)
+        print(f"Time: {time_elapsed}s | Shuttle Pos: {pos} | PLC Input X1: {x1}")
+
 if __name__ == "__main__":
-    test_step6()
+    test_step7()
