@@ -200,55 +200,78 @@ def parse_st(st_code):
 
 
 if __name__ == "__main__":
-    print("Phase 4 - Step 2: Extended ST Parser — ELSE Block\n")
+    print("Phase 4 - Step 3: Multiple Statements per Block\n")
 
-    # --- Test 1: IF/THEN/END_IF (no ELSE) — backward compatible ---
-    st_no_else = """
+    # --- Test 1: Two assignments in THEN, two in ELSE ---
+    st_multi = """
     IF X0 THEN
         Y0 := TRUE;
+        Y1 := TRUE;
+    ELSE
+        Y0 := FALSE;
+        Y1 := FALSE;
     END_IF;
     """
-    print("Test 1 — IF/THEN/END_IF (no ELSE):")
-    print(f"  Input: {st_no_else.strip()}")
-    result = parse_st(st_no_else)
+    print("Test 1 — Two assignments in THEN and ELSE:")
+    print(f"  Input:\n{st_multi.strip()}\n")
+    result = parse_st(st_multi)
     print("  Parsed:")
     print(json.dumps(result, indent=2))
 
-    # --- Test 2: IF/THEN/ELSE/END_IF ---
-    st_with_else = """
-    IF X0 THEN
+    # --- Test 2: Three assignments in THEN, one in ELSE ---
+    st_mixed = """
+    IF X0 AND NOT X1 THEN
         Y0 := TRUE;
+        Y1 := TRUE;
+        Y2 := FALSE;
     ELSE
         Y0 := FALSE;
     END_IF;
     """
-    print("\nTest 2 — IF/THEN/ELSE/END_IF:")
-    print(f"  Input: {st_with_else.strip()}")
-    result2 = parse_st(st_with_else)
+    print("\nTest 2 — Three assignments in THEN, one in ELSE:")
+    print(f"  Input:\n{st_mixed.strip()}\n")
+    result2 = parse_st(st_mixed)
     print("  Parsed:")
     print(json.dumps(result2, indent=2))
 
-    # --- Test 3: ELSE with boolean condition ---
-    st_bool_else = """
-    IF X0 AND NOT X1 THEN
+    # --- Test 3: Multiple statements, no ELSE ---
+    st_no_else = """
+    IF X0 OR X2 THEN
         Y0 := TRUE;
-    ELSE
-        Y0 := FALSE;
+        Y1 := FALSE;
     END_IF;
     """
-    print("\nTest 3 — Boolean condition + ELSE:")
-    print(f"  Input: {st_bool_else.strip()}")
-    result3 = parse_st(st_bool_else)
+    print("\nTest 3 — Two assignments, no ELSE:")
+    print(f"  Input:\n{st_no_else.strip()}\n")
+    result3 = parse_st(st_no_else)
     print("  Parsed:")
     print(json.dumps(result3, indent=2))
 
-    # --- Structural verification ---
+    # --- Structural assertions ---
     print("\n--- Structural Verification ---")
-    r = result2[0]
-    assert r["type"]      == "if_else",                    "type must be if_else"
-    assert r["condition"] == {"op": "VAR", "name": "X0"},  "condition must be VAR X0"
-    assert len(r["then_body"]) == 1,                       "then_body must have 1 statement"
-    assert len(r["else_body"]) == 1,                       "else_body must have 1 statement"
-    assert r["then_body"][0] == {"type": "set", "target": "Y0", "value": True},  "then sets Y0=True"
-    assert r["else_body"][0] == {"type": "set", "target": "Y0", "value": False}, "else sets Y0=False"
-    print("  All structural assertions passed.")
+
+    # Test 1 checks
+    r1 = result[0]
+    assert r1["type"] == "if_else",          "type must be if_else"
+    assert len(r1["then_body"]) == 2,        "then_body must have 2 statements"
+    assert len(r1["else_body"]) == 2,        "else_body must have 2 statements"
+    assert r1["then_body"][0]["target"] == "Y0" and r1["then_body"][0]["value"] is True
+    assert r1["then_body"][1]["target"] == "Y1" and r1["then_body"][1]["value"] is True
+    assert r1["else_body"][0]["target"] == "Y0" and r1["else_body"][0]["value"] is False
+    assert r1["else_body"][1]["target"] == "Y1" and r1["else_body"][1]["value"] is False
+    print("  Test 1: PASS — 2 statements in THEN and ELSE verified")
+
+    # Test 2 checks
+    r2 = result2[0]
+    assert len(r2["then_body"]) == 3,        "then_body must have 3 statements"
+    assert len(r2["else_body"]) == 1,        "else_body must have 1 statement"
+    assert r2["then_body"][2]["target"] == "Y2" and r2["then_body"][2]["value"] is False
+    print("  Test 2: PASS — 3 statements in THEN, 1 in ELSE verified")
+
+    # Test 3 checks
+    r3 = result3[0]
+    assert len(r3["then_body"]) == 2,        "then_body must have 2 statements"
+    assert len(r3["else_body"]) == 0,        "else_body must be empty"
+    print("  Test 3: PASS — 2 statements in THEN, empty ELSE verified")
+
+    print("\n  All structural assertions passed.")
