@@ -164,6 +164,7 @@ def parse_st(st_code):
       END_IF;
 
     Condition may include AND, OR, NOT and parentheses.
+    Block comments (* ... *) are stripped before parsing.
 
     Returns a list of rule dicts:
       - No ELSE:  {"type": "if_else", "condition": <tree>,
@@ -171,6 +172,9 @@ def parse_st(st_code):
       - With ELSE: {"type": "if_else", "condition": <tree>,
                     "then_body": [...], "else_body": [...]}
     """
+    # Strip block comments (* ... *) before parsing
+    st_code = re.sub(r'\(\*.*?\*\)', '', st_code, flags=re.DOTALL)
+
     logic = []
 
     # Match each IF...END_IF block (non-greedy, DOTALL)
