@@ -1,0 +1,75 @@
+{
+  "status": "success",
+  "program": "programs/motor_start.st",
+  "scenarios_run": 4,
+  "summary": {
+    "total_runs": 4,
+    "passed": 4,
+    "failed": 0,
+    "errors": 0,
+    "violations": 0
+  },
+  "failures": [],
+  "violation_summary": {},
+  "calibration": {
+    "profile_name": "default",
+    "score": 1.11,
+    "errors": {
+      "motor_start_delay_ms": {
+        "expected": 300,
+        "measured": 300,
+        "error_pct": 0.0
+      },
+      "motor_stop_delay_ms": {
+        "expected": 200,
+        "measured": 200,
+        "error_pct": 0.0
+      },
+      "cycle_time_ms": {
+        "expected": 3600,
+        "measured": 3600,
+        "error_pct": 0.0
+      },
+      "sensor_trigger_time_ms": {
+        "expected": 1800,
+        "measured": 1700,
+        "error_pct": 5.56
+      },
+      "sensor_active_duration_ms": {
+        "expected": 200,
+        "measured": 200,
+        "error_pct": 0.0
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "scenario": "scenario [1]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [2]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [3]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [4]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    }
+  ]
+}

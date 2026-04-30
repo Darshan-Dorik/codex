@@ -1,0 +1,408 @@
+{
+  "status": "success",
+  "program": "programs/shuttle_control.st",
+  "scenarios_run": 8,
+  "summary": {
+    "total_runs": 8,
+    "passed": 8,
+    "failed": 0,
+    "errors": 0,
+    "violations": 9
+  },
+  "failures": [
+    {
+      "scenario": "scenario [7]",
+      "status": "pass",
+      "errors": [],
+      "violations": [
+        {
+          "time": 300,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 300,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 400,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 400,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 500,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 500,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 600,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 600,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 700,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 700,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 800,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 800,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 900,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 900,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 1000,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 1000,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 1100,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 1100,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        }
+      ],
+      "error_msg": null
+    }
+  ],
+  "violation_summary": {
+    "Y0 must not be True when X1 is True": {
+      "count": 9,
+      "scenarios": [
+        "scenario [7]"
+      ]
+    }
+  },
+  "calibration": {
+    "profile_name": "default",
+    "score": 1.11,
+    "errors": {
+      "motor_start_delay_ms": {
+        "expected": 300,
+        "measured": 300,
+        "error_pct": 0.0
+      },
+      "motor_stop_delay_ms": {
+        "expected": 200,
+        "measured": 200,
+        "error_pct": 0.0
+      },
+      "cycle_time_ms": {
+        "expected": 3600,
+        "measured": 3600,
+        "error_pct": 0.0
+      },
+      "sensor_trigger_time_ms": {
+        "expected": 1800,
+        "measured": 1700,
+        "error_pct": 5.56
+      },
+      "sensor_active_duration_ms": {
+        "expected": 200,
+        "measured": 200,
+        "error_pct": 0.0
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "scenario": "scenario [1]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [2]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [3]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [4]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [5]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [6]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [7]",
+      "status": "pass",
+      "errors": [],
+      "violations": [
+        {
+          "time": 300,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 300,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 400,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 400,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 500,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 500,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 600,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 600,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 700,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 700,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 800,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 800,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 900,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 900,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 1000,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 1000,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        },
+        {
+          "time": 1100,
+          "property": "Y0 must not be True when X1 is True",
+          "state": {
+            "time": 1100,
+            "inputs": {
+              "X0": true,
+              "X1": true,
+              "X2": false
+            },
+            "outputs": {
+              "Y0": true,
+              "Y1": true
+            }
+          }
+        }
+      ],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [8]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    }
+  ]
+}

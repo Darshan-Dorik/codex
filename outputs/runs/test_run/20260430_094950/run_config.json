@@ -1,0 +1,28 @@
+{
+  "program": "programs/motor_start.st",
+  "output_dir": "outputs/runs/test_run",
+  "scenarios": {
+    "inputs": [
+      "X0",
+      "X1"
+    ],
+    "timing": [
+      300,
+      600
+    ],
+    "max_scenarios": 8,
+    "step_ms": 100
+  },
+  "real_world": {
+    "motor_start_delay_ms": 280,
+    "cycle_time_ms": 3500
+  },
+  "properties": [
+    {
+      "name": "Y0 must not be True when X1 is True",
+      "check": "lambda s: not (s['outputs'].get('Y0') and s['inputs'].get('X1'))"
+    }
+  ],
+  "ai_analysis": false,
+  "calibration": null
+}

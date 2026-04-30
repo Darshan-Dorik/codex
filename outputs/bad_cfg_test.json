@@ -1,0 +1,1 @@
+{"output_dir": "outputs/x", "scenarios": {"inputs": ["X0"], "timing": [100], "max_scenarios": 4, "step_ms": 100}}

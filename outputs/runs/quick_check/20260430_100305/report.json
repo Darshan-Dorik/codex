@@ -1,0 +1,31 @@
+{
+  "status": "success",
+  "program": "programs/motor_start.st",
+  "scenarios_run": 2,
+  "summary": {
+    "total_runs": 2,
+    "passed": 2,
+    "failed": 0,
+    "errors": 0,
+    "violations": 0
+  },
+  "failures": [],
+  "violation_summary": {},
+  "calibration": null,
+  "scenarios": [
+    {
+      "scenario": "scenario [1]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [2]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    }
+  ]
+}

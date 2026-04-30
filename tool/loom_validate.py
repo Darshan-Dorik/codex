@@ -25,7 +25,45 @@ for _p in (_ROOT, _TOOL):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from tool.config_loader import load_config, print_config_summary, ConfigError
+from tool.config_loader import load_config, print_config_summary
+
+# ---------------------------------------------------------------------------
+# Preset management
+# ---------------------------------------------------------------------------
+
+PRESETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "presets")
+
+
+def list_presets():
+    """Return list of (name, description) for all preset configs."""
+    presets = []
+    if not os.path.isdir(PRESETS_DIR):
+        return presets
+    for fname in sorted(os.listdir(PRESETS_DIR)):
+        if fname.endswith(".json"):
+            path = os.path.join(PRESETS_DIR, fname)
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                name = fname[:-5]   # strip .json
+                desc = data.get("_description", "(no description)")
+                presets.append({"name": name, "description": desc, "path": path})
+            except Exception:
+                pass
+    return presets
+
+
+def get_preset_path(name):
+    """
+    Resolve a preset name to its file path.
+    Accepts either a bare name (e.g. 'quick_check') or full path.
+    """
+    if os.path.exists(name):
+        return name
+    candidate = os.path.join(PRESETS_DIR, f"{name}.json")
+    if os.path.exists(candidate):
+        return candidate
+    return None
 
 # ---------------------------------------------------------------------------
 # Config template
@@ -88,6 +126,16 @@ Examples:
         action="store_true",
         help="Print a starter config template to stdout"
     )
+    parser.add_argument(
+        "--preset",
+        metavar="NAME",
+        help="Use a built-in preset config (use --list-presets to see options)"
+    )
+    parser.add_argument(
+        "--list-presets",
+        action="store_true",
+        help="List all available preset configs"
+    )
     return parser.parse_args(argv)
 
 
@@ -105,6 +153,29 @@ def main(argv=None):
         print(json.dumps(CONFIG_TEMPLATE, indent=2))
         return 0
 
+    # --- List presets ---
+    if args.list_presets:
+        presets = list_presets()
+        if not presets:
+            print("No presets found.")
+            return 0
+        print("Available presets:")
+        print(f"  {'Name':<30}  Description")
+        print("  " + "-" * 60)
+        for p in presets:
+            print(f"  {p['name']:<30}  {p['description']}")
+        return 0
+
+    # --- Resolve preset to config path ---
+    if args.preset:
+        resolved = get_preset_path(args.preset)
+        if not resolved:
+            print(f"CONFIG ERROR: Preset '{args.preset}' not found. "
+                  f"Use --list-presets to see options.")
+            return 1
+        args.config = resolved
+        print(f"[INFO] Using preset: {args.preset}  ({resolved})")
+
     # --- Require config path for all other modes ---
     if not args.config:
         print("ERROR: config file path required.")
@@ -116,36 +187,53 @@ def main(argv=None):
     print(f"loom-validate  config={args.config}")
     print("-" * 50)
 
-    try:
-        config = load_config(args.config)
-    except ConfigError as e:
-        print(f"CONFIG ERROR: {e}")
+    from tool.error_handler import safe_load_config
+    config, err = safe_load_config(args.config)
+    if err:
+        print(err)
         return 1
 
     print_config_summary(config)
 
-    # --- Dry-run mode: stop here ---
+    # --- Dry-run mode: deep pre-flight checks ---
     if args.dry_run:
-        print("\n[DRY RUN] Config is valid. No simulation will be run.")
-        return 0
+        from tool.dry_run import run_dry_run, print_dry_run_result
+        result = run_dry_run(config)
+        print()
+        print_dry_run_result(result)
+        return 0 if result["passed"] else 1
 
     # --- Full pipeline ---
     print("\n[INFO] Config loaded successfully. Starting pipeline...")
     print()
 
-    from tool.orchestrator import run_pipeline
-    result = run_pipeline(config, verbose=True)
+    from tool.orchestrator      import run_pipeline
+    from tool.output_manager    import create_run_dir, save_run_outputs, \
+                                        print_output_summary
+    from tool.summary_generator import print_summary
+    from tool.error_handler     import safe_run_pipeline
 
+    result, err = safe_run_pipeline(config, verbose=True)
     print()
-    if result["status"] == "error":
-        print(f"PIPELINE ERROR: {result['error']}")
+    if err:
+        print(err)
         return 1
 
-    agg = result["aggregation"]
-    print(f"\n[DONE] {result['scenarios_run']} scenarios — "
-          f"passed={agg.get('passed',0)} "
-          f"failed={agg.get('failed',0)} "
-          f"violations={agg.get('violations',0)}")
+    # Save outputs
+    run_dir = create_run_dir(config["output_dir"])
+    saved   = save_run_outputs(run_dir, result, config)
+
+    # Log the run
+    from tool.run_logger import log_run
+    config["_source_path"] = args.config
+    log_run(config, result, run_dir=run_dir)
+
+    # Human-readable summary
+    print()
+    print_summary(result, config, run_dir=run_dir)
+
+    print()
+    print_output_summary(run_dir, saved)
     return 0
 
 

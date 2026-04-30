@@ -1,0 +1,26 @@
+{
+  "_description": "Basic motor start validation — tests X0/X1 combinations",
+  "program":    "programs/motor_start.st",
+  "output_dir": "outputs/runs/motor_start_basic",
+  "calibration": null,
+  "scenarios": {
+    "inputs":        ["X0", "X1"],
+    "timing":        [300, 600],
+    "max_scenarios": 4,
+    "step_ms":       100
+  },
+  "real_world": {
+    "motor_start_delay_ms":      300,
+    "motor_stop_delay_ms":       200,
+    "cycle_time_ms":             3600,
+    "sensor_trigger_time_ms":    1800,
+    "sensor_active_duration_ms": 200
+  },
+  "properties": [
+    {
+      "name":  "Y0 must not be True when X1 is True",
+      "check": "lambda s: not (s['outputs'].get('Y0') and s['inputs'].get('X1'))"
+    }
+  ],
+  "ai_analysis": false
+}

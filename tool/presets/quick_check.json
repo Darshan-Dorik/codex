@@ -1,0 +1,19 @@
+{
+    "_description": "Quick sanity check — minimal scenarios, fast execution",
+    "program": "programs/motor_start.st",
+    "output_dir": "outputs/runs/quick_check",
+    "calibration": null,
+    "scenarios": {
+        "inputs": [
+            "X0"
+        ],
+        "timing": [
+            300
+        ],
+        "max_scenarios": 2,
+        "step_ms": 100
+    },
+    "real_world": {},
+    "properties": [],
+    "ai_analysis": false
+}

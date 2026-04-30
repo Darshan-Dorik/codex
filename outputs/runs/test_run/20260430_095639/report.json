@@ -1,0 +1,60 @@
+{
+  "status": "success",
+  "program": "programs/motor_start.st",
+  "scenarios_run": 4,
+  "summary": {
+    "total_runs": 4,
+    "passed": 4,
+    "failed": 0,
+    "errors": 0,
+    "violations": 0
+  },
+  "failures": [],
+  "violation_summary": {},
+  "calibration": {
+    "profile_name": "default",
+    "score": 5.0,
+    "errors": {
+      "motor_start_delay_ms": {
+        "expected": 280,
+        "measured": 300,
+        "error_pct": 7.14
+      },
+      "cycle_time_ms": {
+        "expected": 3500,
+        "measured": 3600,
+        "error_pct": 2.86
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "scenario": "scenario [1]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [2]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [3]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    },
+    {
+      "scenario": "scenario [4]",
+      "status": "pass",
+      "errors": [],
+      "violations": [],
+      "error_msg": null
+    }
+  ]
+}
