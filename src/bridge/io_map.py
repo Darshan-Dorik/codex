@@ -296,7 +296,7 @@ def require_program_match(io_map, program, consumer):
 # Legacy unscoped map
 # ---------------------------------------------------------------------------
 
-def make_loom_io_map():
+def make_loom_io_map(allow_unscoped=False):
     """
     Legacy combined loom IO map. UNSCOPED — prefer the program-scoped
     maps above.
@@ -307,12 +307,33 @@ def make_loom_io_map():
     shuttle_control.st puts the position sensor on X1, so this map
     mislabels every shuttle_control trace at X1.
 
-    Retained because existing call sites default to it. New code should
-    use io_map_for_program().
+    Because that defect is invisible in the output — a wrong label
+    reads exactly like a right one — reaching for this map has to be
+    deliberate. It raises unless you pass allow_unscoped=True, which
+    is the caller stating on the record that no program is known and
+    the labels are therefore unverified.
+
+    Args:
+        allow_unscoped : bool — must be True. Callers that legitimately
+                         have no program (a trace with no declared
+                         provenance) pass it explicitly and surface a
+                         warning of their own.
 
     Returns:
         IOMap instance with program=None
+
+    Raises:
+        ValueError — unless allow_unscoped=True.
     """
+    if not allow_unscoped:
+        raise ValueError(
+            "make_loom_io_map() is unscoped and mislabels X1 on "
+            "shuttle_control traces (fault sensor vs position sensor). "
+            "Use io_map_for_program(program), or pass "
+            "allow_unscoped=True to accept unverified labels "
+            "deliberately."
+        )
+
     m = IOMap(program=None)
 
     # Inputs
@@ -343,7 +364,7 @@ if __name__ == "__main__":
     print("Phase 7 - Step 1: IO Mapping Layer")
     print("=" * 60)
 
-    io = make_loom_io_map()
+    io = make_loom_io_map(allow_unscoped=True)
 
     # --- Test 1: name lookup ---
     print("\nTest 1 — Symbol → Name lookup:")
@@ -438,7 +459,8 @@ if __name__ == "__main__":
     ok_warnings = require_program_match(sc, SHUTTLE_CONTROL_PROGRAM, "test")
     print(f"  matching        → {len(ok_warnings)} warning(s)")
 
-    unscoped_warnings = require_program_match(make_loom_io_map(),
+    unscoped_warnings = require_program_match(
+                            make_loom_io_map(allow_unscoped=True),
                                               SHUTTLE_CONTROL_PROGRAM, "test")
     print(f"  unscoped map    → {unscoped_warnings[0]}")
 
@@ -464,7 +486,8 @@ if __name__ == "__main__":
 
     assert ms.program == MOTOR_START_PROGRAM
     assert sc.program == SHUTTLE_CONTROL_PROGRAM
-    assert make_loom_io_map().program is None, "legacy map is unscoped"
+    assert make_loom_io_map(allow_unscoped=True).program is None, \
+        "legacy map is unscoped"
     print("  PASS — scoped maps declare their program; legacy is unscoped")
 
     assert io_map_for_program("shuttle_control.st").program == \
@@ -484,3 +507,13 @@ if __name__ == "__main__":
     assert manifest["signals"]["X1"]["name"] == "Position Sensor"
     assert sc.to_dict() == manifest["signals"], "to_dict stays bare"
     print("  PASS — to_manifest carries program, to_dict unchanged")
+
+    guard_err = None
+    try:
+        make_loom_io_map()
+    except ValueError as exc:
+        guard_err = str(exc)
+    assert guard_err is not None, \
+        "the unscoped map must refuse to be built by accident"
+    assert "allow_unscoped=True" in guard_err
+    print("  PASS — unscoped map raises unless deliberately allowed")

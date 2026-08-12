@@ -76,7 +76,7 @@ def build_comparison_package(program, sim_trace, real_trace,
         try:
             io_map = io_map_for_program(program)
         except KeyError as exc:
-            io_map = make_loom_io_map()
+            io_map = make_loom_io_map(allow_unscoped=True)
             warnings.append(str(exc))
 
     diff_result = diff_traces(sim_trace, real_trace,
@@ -161,7 +161,7 @@ if __name__ == "__main__":
         exit(1)
 
     sim_trace = load_sim_trace(sim_trace_path)
-    io_map    = make_loom_io_map()
+    io_map    = make_loom_io_map(allow_unscoped=True)
 
     # -------------------------------------------------------
     # Package A: clean (no mismatches)

@@ -73,10 +73,10 @@ def build_readable_report(diff_result, io_map=None):
             try:
                 io_map = io_map_for_program(program)
             except KeyError as exc:
-                io_map = make_loom_io_map()
+                io_map = make_loom_io_map(allow_unscoped=True)
                 warnings.append(str(exc))
         else:
-            io_map = make_loom_io_map()
+            io_map = make_loom_io_map(allow_unscoped=True)
 
     warnings.extend(
         require_program_match(io_map, program, "build_readable_report")
@@ -143,7 +143,7 @@ if __name__ == "__main__":
         exit(1)
 
     sim_trace = load_sim_trace(sim_trace_path)
-    io_map    = make_loom_io_map()
+    io_map    = make_loom_io_map(allow_unscoped=True)
 
     # -------------------------------------------------------
     # Test 1: no mismatches
