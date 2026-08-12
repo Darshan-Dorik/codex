@@ -48,6 +48,12 @@ python3 src/bridge/trace_diff.py
 
 `src/core/plc.py`, `src/core/loom.py`, and `tool/*.py` set up `sys.path` themselves and run bare. `tool/orchestrator.py` is the canonical example of the path-injection preamble to copy when adding a new entry point.
 
+### Symbols are program-scoped
+
+`X1` is the **fault sensor** in `programs/motor_start.st` and the **position sensor** in `programs/shuttle_control.st`. A symbol has no meaning without knowing which ST program produced the trace, so `io_map.py` ships one map per program (`make_motor_start_io_map`, `make_shuttle_io_map`, selected via `io_map_for_program`). `make_loom_io_map` is the legacy unscoped map — it matches neither program exactly and mislabels `X1` on shuttle traces; it is retained only because existing call sites default to it.
+
+The twin models a position sensor and a jam condition and has **no fault sensor at all**, so anything captured from `loom_twin` / `ui/api_server.py` is `shuttle_control`-scoped.
+
 **`src/testing/system.py` is stale** — it calls `plc.scan(dt=...)` and `loom.update(dt=...)` against the old signatures (both now take `current_time_ms`). Don't treat it as a reference.
 
 ## Architecture
@@ -66,7 +72,7 @@ Layers communicate through plain dicts/JSON, not objects. The recurring shapes:
 - **Scenario**: `{"name", "initial_inputs", "events": [{"time", "inputs"}], "expected"}` — consumed by `TestHarness.load_scenario`.
 - **Property**: `{"name": str, "check": callable(state) -> bool}` where `state` is `{"time", "inputs", "outputs"}`. In config JSON the check is a *lambda source string* that `orchestrator._build_properties` `eval`s — configs are operator-supplied and trusted.
 - **Calibration profile**: `{"name", "description", "parameters": {"motor": {...}, "shuttle": {...}, "sensor": {...}}}` — see `outputs/profiles/*.json`.
-- **Trace** (`src/bridge/`): either a bare entry list (legacy, treated as unknown provenance) or `{"provenance": {"timestamp": ...}, "entries": [...]}` from `trace_aligner.wrap_trace`. Provenance is load-bearing, not decoration — `align_traces` refuses tolerance 0 on an `arrival_timestamp` trace, because arrival timestamps carry poll phase and network jitter.
+- **Trace** (`src/bridge/`): either a bare entry list (legacy, treated as unknown provenance) or `{"provenance": {"timestamp": ..., "program": ...}, "entries": [...]}` from `trace_aligner.wrap_trace`. Provenance is load-bearing, not decoration — `align_traces` refuses tolerance 0 on an `arrival_timestamp` trace, and `readable_report` picks its IO map from the declared program and *raises* if handed a map scoped to a different one.
 - **State** (`ui/api_server.py` → React): `{"time", "motor_running", "shuttle_position", "sensors": {X0,X1,X2}, "jam_detected"}`.
 
 ### Pipeline (`tool/orchestrator.py:run_pipeline`)
@@ -84,7 +90,7 @@ The pipeline suppresses per-tick stdout by swapping `sys.stdout` for a `StringIO
 | `src/batch/` | `scenario_generator` (deterministic input×timing sweep, `max_scenarios` cap), `batch_executor`, `batch_runner` (many programs, one scenario) |
 | `src/analysis/` | `aggregator`, `coverage_gap`, `log_filter` (timeline compression), `analysis_payload` / `export_analysis` (build the JSON the AI layer consumes) |
 | `src/ai/` | `ollama_client` (stdlib `urllib` → `/api/generate`), `prompt_builder`, `prompt_limiter` (token budget), `failure_explainer` / `coverage_analyzer` / `scenario_suggester` / `safety_analyzer`, `ai_report` (fans out to all four), `prompt_snapshot` (audit trail of prompts sent) |
-| `src/bridge/` | **Standalone, not wired into the CLI.** Compares simulation traces against real-machine traces: `io_map`, `sim_trace` / `real_trace` / `trace_recorder`, `real_adapter` (currently a mock), `trace_aligner` (two-pointer matching + offset diagnostics), `trace_diff` (ticks / transitions modes), `mismatch_report`, `readable_report`, `comparison_export` |
+| `src/bridge/` | **Standalone, not wired into the CLI.** Compares simulation traces against real-machine traces: `io_map` (program-scoped), `sim_trace` / `real_trace` / `trace_recorder`, `real_adapter` (currently a mock), `trace_aligner` (two-pointer matching + offset diagnostics), `trace_diff` (ticks / transitions modes), `mismatch_report`, `readable_report`, `comparison_export` |
 | `loom_twin.py` | High-fidelity twin: `MotorStateMachine` (startup/stop delays), `CyclicShuttleModel`, `PositionSensor`, `DelayedSensor` (delay + miss-every-n noise) |
 | `calibration.py` | Measure the twin, compare to real-world targets, iteratively adjust profile parameters, drift detection, `ProfileRegistry`, calibrated-model save/load |
 

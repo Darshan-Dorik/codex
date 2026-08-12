@@ -9,7 +9,8 @@ Example output:
   "At 500ms: Start Button expected ON but was OFF"
 """
 
-from io_map import IOMap, make_loom_io_map
+from io_map import (IOMap, make_loom_io_map, io_map_for_program,
+                    require_program_match)
 from mismatch_report import build_mismatch_summary, require_ticks_mode
 from trace_diff import diff_traces
 
@@ -43,22 +44,43 @@ def build_readable_report(diff_result, io_map=None):
 
     Args:
         diff_result : dict — from diff_traces() in ticks mode
-        io_map      : IOMap | None — if None, uses make_loom_io_map()
+        io_map      : IOMap | None — if None, the map is selected from
+                      the program the traces declare. Falls back to
+                      make_loom_io_map() (unscoped) only when no
+                      program is declared.
 
     Returns:
         {
           "messages":  [str, ...],   # one message per mismatch
           "summary":   str,          # one-line overall summary
-          "has_mismatches": bool
+          "has_mismatches": bool,
+          "program":   str | None,   # program the traces declared
+          "io_map_program": str | None,
+          "warnings":  [str, ...]    # unverified-labelling warnings
         }
 
     Raises:
-        ValueError — if given a transitions-mode diff result.
+        ValueError — if given a transitions-mode diff result, or an
+        IO map scoped to a different program than the traces declare.
     """
     require_ticks_mode(diff_result, "build_readable_report")
 
+    program  = diff_result.get("program")
+    warnings = []
+
     if io_map is None:
-        io_map = make_loom_io_map()
+        if program:
+            try:
+                io_map = io_map_for_program(program)
+            except KeyError as exc:
+                io_map = make_loom_io_map()
+                warnings.append(str(exc))
+        else:
+            io_map = make_loom_io_map()
+
+    warnings.extend(
+        require_program_match(io_map, program, "build_readable_report")
+    )
 
     mismatches = diff_result["mismatches"]
     mm_summary = build_mismatch_summary(diff_result)
@@ -85,7 +107,10 @@ def build_readable_report(diff_result, io_map=None):
     return {
         "messages":       messages,
         "summary":        summary,
-        "has_mismatches": len(mismatches) > 0
+        "has_mismatches": len(mismatches) > 0,
+        "program":        program,
+        "io_map_program": io_map.program,
+        "warnings":       warnings,
     }
 
 
@@ -205,3 +230,59 @@ if __name__ == "__main__":
     assert "ticks-mode" in rejected
     print("  PASS — transitions-mode diff rejected explicitly")
 
+    # -------------------------------------------------------
+    # Program-scoped labelling
+    # -------------------------------------------------------
+    print("\n" + "=" * 60)
+    print("Program-scoped labelling")
+    print("=" * 60)
+
+    from trace_aligner import wrap_trace, TS_SCAN
+    from io_map import (make_motor_start_io_map, make_shuttle_io_map,
+                        MOTOR_START_PROGRAM, SHUTTLE_CONTROL_PROGRAM)
+
+    # outputs/sim_trace.json is produced from programs/motor_start.st,
+    # so that is what these traces honestly declare.
+    sim_scoped  = wrap_trace(sim_trace, TS_SCAN,
+                             program=MOTOR_START_PROGRAM)
+    real_scoped = wrap_trace(real_noisy, TS_SCAN,
+                             program=MOTOR_START_PROGRAM)
+    diff_scoped = diff_traces(sim_scoped, real_scoped, tolerance_ms=0)
+
+    print(f"\n  traces declare : {diff_scoped['program']}")
+    auto = build_readable_report(diff_scoped)          # io_map=None
+    print(f"  auto-selected  : {auto['io_map_program']}")
+    print(f"  warnings       : {len(auto['warnings'])}")
+    for msg in auto["messages"]:
+        print(f"    • {msg}")
+
+    # The wrong map for these traces must be refused, not tolerated.
+    wrong_map_err = None
+    try:
+        build_readable_report(diff_scoped, make_shuttle_io_map())
+    except ValueError as exc:
+        wrong_map_err = str(exc)
+    print(f"\n  shuttle map on a motor_start trace → raised")
+
+    # An unscoped trace still works, but says so.
+    unscoped = build_readable_report(diff2)
+    print(f"  undeclared trace → {len(unscoped['warnings'])} warning(s): "
+          f"{unscoped['warnings'][0][:60]}...")
+
+    print("\n--- Program scoping assertions ---")
+
+    assert diff_scoped["program"] == MOTOR_START_PROGRAM, \
+        "program must flow from trace provenance into the diff"
+    assert auto["io_map_program"] == MOTOR_START_PROGRAM, \
+        "map must be selected from the declared program"
+    assert auto["warnings"] == [], "a clean match warns about nothing"
+    print("  PASS — declared program selects the IO map automatically")
+
+    assert wrong_map_err is not None, "mismatched map must raise"
+    assert "every label in this report would be wrong" in wrong_map_err
+    print("  PASS — IO map scoped to another program is refused")
+
+    assert unscoped["program"] is None
+    assert len(unscoped["warnings"]) == 1, \
+        "an undeclared trace must warn that labels are unverified"
+    print("  PASS — undeclared trace labelled but flagged unverified")

@@ -156,6 +156,8 @@ def _diff_ticks(sim_trace, real_trace, tolerance_ms, signals_to_check,
         "mode":             "ticks",
         "mismatches":       mismatches,
         "alignment":        alignment,
+        "program":          alignment["program_sim"] or
+                            alignment["program_real"],
         "total_compared":   total_compared,
         "total_mismatches": len(mismatches),
         "warnings":         warnings,
@@ -278,6 +280,15 @@ def _diff_transitions(sim_trace, real_trace, tolerance_ms,
                 f"assuming unknown"
             )
 
+    prog_sim  = sim_c["provenance"].get("program")
+    prog_real = real_c["provenance"].get("program")
+    if prog_sim and prog_real and prog_sim != prog_real:
+        warnings.append(
+            f"program mismatch: sim trace declares {prog_sim}, real "
+            f"trace declares {prog_real}. Symbol meanings differ "
+            f"between programs; this comparison is not meaningful."
+        )
+
     if cascade:
         warnings.insert(0,
             f"CASCADE SUSPECTED — {pooled_offsets['nonzero_offset_pairs']} "
@@ -300,6 +311,7 @@ def _diff_transitions(sim_trace, real_trace, tolerance_ms,
             "offsets":       pooled_offsets,
         },
         "per_signal":       per_signal,
+        "program":          prog_sim or prog_real,
         "compression": {
             "sim":  {k: sim_c[k] for k in
                      ("total_entries", "kept_entries", "dropped_entries")},

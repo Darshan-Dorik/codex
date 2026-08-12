@@ -443,6 +443,8 @@ def align_traces(sim_trace, real_trace, tolerance_ms=50,
           "duplicate_real_timestamps": int,
           "provenance_sim":   str,
           "provenance_real":  str,
+          "program_sim":      str | None,   # ST program each trace
+          "program_real":     str | None,   # declares, if any
           "offsets":          {...},   # offset_histogram() — read this,
                                        # not total_aligned
           "steal_backs":      int,     # deferrals made (see below)
@@ -492,6 +494,18 @@ def align_traces(sim_trace, real_trace, tolerance_ms=50,
                 f"{name} trace declares no timestamp provenance; "
                 f"assuming {TS_UNKNOWN}"
             )
+
+    # Program identity is provenance, not a lookup key: the same symbol
+    # means different things in different ST programs, so comparing
+    # traces from two programs compares two different machines.
+    prog_sim  = sim_prov.get("program")
+    prog_real = real_prov.get("program")
+    if prog_sim and prog_real and prog_sim != prog_real:
+        warnings.append(
+            f"program mismatch: sim trace declares {prog_sim}, real "
+            f"trace declares {prog_real}. Symbol meanings differ "
+            f"between programs; this comparison is not meaningful."
+        )
 
     dup_sim  = _count_duplicate_timestamps(sim_entries)
     dup_real = _count_duplicate_timestamps(real_entries)
@@ -593,6 +607,8 @@ def align_traces(sim_trace, real_trace, tolerance_ms=50,
         "duplicate_real_timestamps": dup_real,
         "provenance_sim":  ts_sim,
         "provenance_real": ts_real,
+        "program_sim":     prog_sim,
+        "program_real":    prog_real,
         "offsets":         offsets,
         "steal_backs":     steal_backs,
         "warnings":        warnings,

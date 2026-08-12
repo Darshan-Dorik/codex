@@ -41,7 +41,8 @@ import os
 from trace_diff import diff_traces
 from mismatch_report import build_mismatch_summary, require_ticks_mode
 from readable_report import build_readable_report
-from io_map import IOMap, make_loom_io_map
+from io_map import (IOMap, make_loom_io_map, io_map_for_program,
+                    require_program_match)
 
 
 def build_comparison_package(program, sim_trace, real_trace,
@@ -69,27 +70,47 @@ def build_comparison_package(program, sim_trace, real_trace,
         which the summary and readable report cannot render — see
         mismatch_report.require_ticks_mode.
     """
+    warnings = []
+
     if io_map is None:
-        io_map = make_loom_io_map()
+        try:
+            io_map = io_map_for_program(program)
+        except KeyError as exc:
+            io_map = make_loom_io_map()
+            warnings.append(str(exc))
 
     diff_result = diff_traces(sim_trace, real_trace,
                               tolerance_ms=tolerance_ms,
                               signals_to_check=signals_to_check)
     require_ticks_mode(diff_result, "build_comparison_package")
 
+    # The program the traces declare wins over the argument — the
+    # traces are the evidence, the argument is a label.
+    declared = diff_result.get("program")
+    if declared and declared != program:
+        warnings.append(
+            f"traces declare program {declared} but the package was "
+            f"built as {program}; using the declared program"
+        )
+    effective_program = declared or program
+
+    warnings.extend(require_program_match(io_map, effective_program,
+                                          "build_comparison_package"))
+
     summary  = build_mismatch_summary(diff_result)
     readable = build_readable_report(diff_result, io_map)
 
     return {
-        "program":         program,
+        "program":         effective_program,
         "io_map":          io_map.to_dict(),
+        "io_map_manifest": io_map.to_manifest(),
         "sim_trace":       sim_trace,
         "real_trace":      real_trace,
         "diff":            diff_result["mismatches"],
         "summary":         summary,
         "readable_report": readable,
         "offsets":         diff_result["alignment"]["offsets"],
-        "warnings":        diff_result["warnings"],
+        "warnings":        warnings + diff_result["warnings"],
         "trustworthy":     diff_result["trustworthy"],
     }
 
@@ -249,3 +270,36 @@ if __name__ == "__main__":
     assert "offsets" in pkg_a, "package must carry offset diagnostics"
     print("  PASS — package carries trustworthy flag and offset histogram")
 
+    # --- Program scoping ---
+    from trace_aligner import wrap_trace, TS_SCAN
+    from io_map import MOTOR_START_PROGRAM, make_shuttle_io_map
+
+    pkg_scoped = build_comparison_package(
+        program=MOTOR_START_PROGRAM,
+        sim_trace=wrap_trace(sim_trace, TS_SCAN,
+                             program=MOTOR_START_PROGRAM),
+        real_trace=wrap_trace(real_faulty, TS_SCAN,
+                              program=MOTOR_START_PROGRAM),
+        io_map=None,               # selected from the declared program
+        tolerance_ms=0
+    )
+    assert pkg_scoped["io_map_manifest"]["program"] == MOTOR_START_PROGRAM
+    assert pkg_scoped["program"] == MOTOR_START_PROGRAM
+    assert pkg_scoped["readable_report"]["warnings"] == []
+    print(f"  PASS — package auto-selected the "
+          f"{pkg_scoped['io_map_manifest']['program']} map from provenance")
+
+    wrong_err = None
+    try:
+        build_comparison_package(
+            program=MOTOR_START_PROGRAM,
+            sim_trace=wrap_trace(sim_trace, TS_SCAN,
+                                 program=MOTOR_START_PROGRAM),
+            real_trace=wrap_trace(real_faulty, TS_SCAN,
+                                  program=MOTOR_START_PROGRAM),
+            io_map=make_shuttle_io_map(),
+            tolerance_ms=0)
+    except ValueError as exc:
+        wrong_err = str(exc)
+    assert wrong_err is not None, "wrong-program map must be refused"
+    print("  PASS — package refuses an IO map from another program")
