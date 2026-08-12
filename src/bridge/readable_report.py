@@ -10,7 +10,7 @@ Example output:
 """
 
 from io_map import IOMap, make_loom_io_map
-from mismatch_report import build_mismatch_summary
+from mismatch_report import build_mismatch_summary, require_ticks_mode
 from trace_diff import diff_traces
 
 
@@ -42,7 +42,7 @@ def build_readable_report(diff_result, io_map=None):
     Build a human-readable report from a diff result.
 
     Args:
-        diff_result : dict — from diff_traces()
+        diff_result : dict — from diff_traces() in ticks mode
         io_map      : IOMap | None — if None, uses make_loom_io_map()
 
     Returns:
@@ -51,7 +51,12 @@ def build_readable_report(diff_result, io_map=None):
           "summary":   str,          # one-line overall summary
           "has_mismatches": bool
         }
+
+    Raises:
+        ValueError — if given a transitions-mode diff result.
     """
+    require_ticks_mode(diff_result, "build_readable_report")
+
     if io_map is None:
         io_map = make_loom_io_map()
 
@@ -187,3 +192,16 @@ if __name__ == "__main__":
            "Position Indicator" in report2["summary"], \
         "summary must contain human-readable signal names"
     print("  PASS — summary contains human-readable signal names")
+
+    # --- Transitions-mode rejection ---
+    tdiff = diff_traces(sim_trace, real_noisy, tolerance_ms=0,
+                        mode="transitions")
+    rejected = None
+    try:
+        build_readable_report(tdiff)
+    except ValueError as exc:
+        rejected = str(exc)
+    assert rejected is not None, "transitions mode must be rejected"
+    assert "ticks-mode" in rejected
+    print("  PASS — transitions-mode diff rejected explicitly")
+

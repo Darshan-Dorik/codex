@@ -23,15 +23,23 @@ Package schema:
     "messages":       [...],
     "summary":        str,
     "has_mismatches": bool
-  }
+  },
+  "offsets":     {...},        # trace_aligner.offset_histogram
+  "warnings":    [str, ...],
+  "trustworthy": bool          # False when the alignment looks
+                               # cascaded — read this before the
+                               # mismatch count, which is meaningless
+                               # if the pairing is wrong
 }
+
+Ticks mode only — see build_comparison_package.
 """
 
 import json
 import os
 
 from trace_diff import diff_traces
-from mismatch_report import build_mismatch_summary
+from mismatch_report import build_mismatch_summary, require_ticks_mode
 from readable_report import build_readable_report
 from io_map import IOMap, make_loom_io_map
 
@@ -51,7 +59,15 @@ def build_comparison_package(program, sim_trace, real_trace,
         signals_to_check : list | None — signals to compare
 
     Returns:
-        dict — full comparison package
+        dict — full comparison package. "trustworthy" is False when
+        the underlying alignment looks cascaded; the package is still
+        written, but nothing in it should be believed until the
+        alignment is explained.
+
+    Note:
+        Ticks mode only. Transitions-mode diffs carry edge events,
+        which the summary and readable report cannot render — see
+        mismatch_report.require_ticks_mode.
     """
     if io_map is None:
         io_map = make_loom_io_map()
@@ -59,6 +75,7 @@ def build_comparison_package(program, sim_trace, real_trace,
     diff_result = diff_traces(sim_trace, real_trace,
                               tolerance_ms=tolerance_ms,
                               signals_to_check=signals_to_check)
+    require_ticks_mode(diff_result, "build_comparison_package")
 
     summary  = build_mismatch_summary(diff_result)
     readable = build_readable_report(diff_result, io_map)
@@ -70,7 +87,10 @@ def build_comparison_package(program, sim_trace, real_trace,
         "real_trace":      real_trace,
         "diff":            diff_result["mismatches"],
         "summary":         summary,
-        "readable_report": readable
+        "readable_report": readable,
+        "offsets":         diff_result["alignment"]["offsets"],
+        "warnings":        diff_result["warnings"],
+        "trustworthy":     diff_result["trustworthy"],
     }
 
 
@@ -213,3 +233,19 @@ if __name__ == "__main__":
     assert loaded_b["summary"] == pkg_b["summary"]
     assert loaded_b["diff"]    == pkg_b["diff"]
     print("  PASS — JSON round-trip identical")
+
+    # --- Transitions-mode rejection + cascade surfacing ---
+    from trace_diff import diff_traces as _dt
+    tdiff = _dt(sim_trace, real_faulty, tolerance_ms=0, mode="transitions")
+    rejected = None
+    try:
+        build_mismatch_summary(tdiff)
+    except ValueError as exc:
+        rejected = str(exc)
+    assert rejected is not None, "transitions mode must be rejected"
+    print("  PASS — transitions-mode diff rejected by the package builders")
+
+    assert "trustworthy" in pkg_a and pkg_a["trustworthy"] is True
+    assert "offsets" in pkg_a, "package must carry offset diagnostics"
+    print("  PASS — package carries trustworthy flag and offset histogram")
+

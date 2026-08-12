@@ -24,16 +24,44 @@ Summary schema:
 from trace_diff import diff_traces
 
 
+def require_ticks_mode(diff_result, consumer):
+    """
+    Reject a transitions-mode diff result.
+
+    This module and its siblings read per-tick mismatches keyed on
+    ("time", "signal", "sim", "real"). Transitions mode emits edge
+    events instead — ("sim_edge_ms", "real_edge_ms", "delta_ms",
+    "kind"), where "sim" or "real" may legitimately be None for an
+    edge that exists on only one side. Feeding those through here
+    would produce a report that renders without error and means
+    something else entirely, so it is refused outright rather than
+    half-handled.
+    """
+    mode = diff_result.get("mode", "ticks")
+    if mode != "ticks":
+        raise ValueError(
+            f"{consumer} requires a ticks-mode diff result, got "
+            f"mode={mode!r}. Transitions-mode mismatches are edge "
+            f"events with a different shape; render them with "
+            f"trace_diff.print_diff, or diff again with mode='ticks'."
+        )
+
+
 def build_mismatch_summary(diff_result):
     """
     Aggregate a diff result into a structured mismatch summary.
 
     Args:
-        diff_result : dict — from diff_traces()
+        diff_result : dict — from diff_traces() in ticks mode
 
     Returns:
         summary dict
+
+    Raises:
+        ValueError — if given a transitions-mode diff result.
     """
+    require_ticks_mode(diff_result, "build_mismatch_summary")
+
     mismatches     = diff_result["mismatches"]
     total_compared = diff_result["total_compared"]
     total_mm       = len(mismatches)
@@ -168,3 +196,15 @@ if __name__ == "__main__":
     rate = summary2["mismatch_rate"]
     assert 0 < rate < 100,                 "rate must be between 0 and 100"
     print(f"  PASS — mismatch_rate={rate}% (non-zero, < 100%)")
+
+    # --- Transitions-mode rejection ---
+    tdiff = diff_traces(sim_trace, real_noisy, tolerance_ms=0,
+                        mode="transitions")
+    rejected = None
+    try:
+        build_mismatch_summary(tdiff)
+    except ValueError as exc:
+        rejected = str(exc)
+    assert rejected is not None, "transitions mode must be rejected"
+    assert "ticks-mode" in rejected
+    print("  PASS — transitions-mode diff rejected explicitly")
