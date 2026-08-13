@@ -461,12 +461,17 @@ if __name__ == "__main__":
     # -------------------------------------------------------
     print("\nTest 7 — Transitions mode, Y0 rises late:")
 
-    def _defer_rise(by_ticks):
-        """Push the Y0 rising edge later by N ticks of 100ms."""
+    # The golden is sampled at the 10ms scan period, so "one scan late"
+    # is 10ms. Deferring by 100ms here would be ten scans and would
+    # quietly test something else.
+    SCAN_PERIOD_MS = 10
+
+    def _defer_rise(by_scans):
+        """Push the Y0 rising edge later by N scans of SCAN_PERIOD_MS."""
         out = []
         for e in create_mock_real_trace(sim_trace):
             sigs = dict(e["signals"])
-            if 200 <= e["time"] < 200 + by_ticks * 100:
+            if 200 <= e["time"] < 200 + by_scans * SCAN_PERIOD_MS:
                 sigs["Y0"] = False
             out.append({"time": e["time"], "signals": sigs})
         return out
@@ -474,7 +479,7 @@ if __name__ == "__main__":
     # One scan late, with one scan of tolerance: inside tolerance, so it
     # is an OFFSET, not a mismatch. The lateness is still visible.
     tdiff3 = diff_traces(sim_trace, _defer_rise(1), tolerance_ms=None,
-                         scan_period_ms=100, tolerance_scans=1,
+                         scan_period_ms=SCAN_PERIOD_MS, tolerance_scans=1,
                          mode="transitions")
     print_diff(tdiff3)
     y0_offsets = [p["offset_ms"] for p in tdiff3["per_signal"]["Y0"]["aligned"]]
@@ -485,7 +490,7 @@ if __name__ == "__main__":
     # match on either side.
     print("\n  Two scans late (beyond tolerance):")
     tdiff3b = diff_traces(sim_trace, _defer_rise(2), tolerance_ms=None,
-                          scan_period_ms=100, tolerance_scans=1,
+                          scan_period_ms=SCAN_PERIOD_MS, tolerance_scans=1,
                           mode="transitions")
     print_diff(tdiff3b)
 
@@ -570,8 +575,8 @@ if __name__ == "__main__":
     # An edge that is late but inside tolerance is an offset, not a
     # mismatch — that is the whole point of expressing tolerance in
     # scan cycles. It must still be visible in the offsets.
-    assert 100 in y0_offsets, \
-        "a one-scan-late edge must be recorded as a +100ms offset"
+    assert SCAN_PERIOD_MS in y0_offsets, \
+        f"a one-scan-late edge must be recorded as a +{SCAN_PERIOD_MS}ms offset"
     assert not [m for m in tdiff3["mismatches"] if m["signal"] == "Y0"], \
         "an edge inside tolerance must not be reported as a mismatch"
     print(f"  PASS — Test 7: one-scan-late Y0 rise → offset "

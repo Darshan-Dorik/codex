@@ -19,7 +19,8 @@ class TestHarness:
         self.output_timeline = []
         self.violations = []    # reset violations on each load
 
-    def run(self, max_time_ms=1000, step_ms=100, logic=None, wiring=None):
+    def run(self, max_time_ms=1000, step_ms=100, logic=None, wiring=None,
+            scan_period_ms=None, sim_step_ms=None):
         """
         Run the scenario simulation.
 
@@ -27,7 +28,35 @@ class TestHarness:
                 each scan cycle.  Use it to wire loom sensor state back into
                 PLC inputs (e.g. shuttle position sensor, jam sensor).
                 If None, only the default Y0 -> motor_running link is applied.
+
+        RATES
+        -----
+        scan_period_ms : PLC scan period. Defaults to step_ms.
+        sim_step_ms    : physics integration step. Defaults to
+                         scan_period_ms, i.e. SINGLE-RATE.
+
+        Single-rate is the legacy mode and cannot represent a sub-scan
+        event: the PLC sees every physics update, so a sensor pulse
+        that rises and falls between two scans cannot exist. It is
+        retained because the whole scenario suite is written against
+        it, and because this harness's LoomState is a linear integrator
+        — sub-stepping it is numerically identical, so the distinction
+        only bites when `wiring` drives loom_twin, whose threshold
+        sensor CAN pulse between scans.
+
+        For the closed-loop twin at a realistic 1ms/10ms split, see
+        src/shim/twin_runtime.py.
         """
+        if scan_period_ms is None:
+            scan_period_ms = step_ms
+        if sim_step_ms is None:
+            sim_step_ms = scan_period_ms
+        if scan_period_ms % sim_step_ms != 0:
+            raise ValueError(
+                f"scan_period_ms={scan_period_ms} must be an exact "
+                f"multiple of sim_step_ms={sim_step_ms}")
+        sub_steps = scan_period_ms // sim_step_ms
+        step_ms = scan_period_ms
         print(f"--- Running Scenario: {self.scenario['name']} ---")
         
         self.plc = PLC()
@@ -92,8 +121,17 @@ class TestHarness:
                     })
                     print(f"  [VIOLATION] t={current_time}ms: {v['property']}")
 
-            # 7. Update Loom physics
-            self.loom.update(current_time)
+            # 7. Update Loom physics.
+            #    Dual-rate: integrate in sim_step_ms increments up to the
+            #    scan boundary, so a wiring callback driving loom_twin
+            #    sees finer motion than the PLC sampled. Single-rate
+            #    (sub_steps == 1) is the legacy single call, unchanged.
+            if sub_steps == 1:
+                self.loom.update(current_time)
+            else:
+                base = current_time - step_ms
+                for _sub in range(1, sub_steps + 1):
+                    self.loom.update(base + _sub * sim_step_ms)
             
             print(f"Time: {current_time}ms | Inputs: {self.plc.inputs} | Outputs: {self.plc.outputs} | ShuttlePos: {round(self.loom.shuttle_position, 2)}")
 

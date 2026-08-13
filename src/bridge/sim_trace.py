@@ -110,7 +110,18 @@ if __name__ == "__main__":
     logic   = parse_st(st_code)
 
     # --- Run and export ---
-    trace = export_sim_trace(scenario, logic, max_time_ms=700, step_ms=100)
+    # Scan period is 10ms (see src/shim/twin_runtime.py). Derivation of
+    # this golden:
+    #   entry count  700ms / 10ms          = 70 scans
+    #   Y0 rises     t=200ms  X0 event; TestHarness applies events
+    #                         BEFORE the scan in the same tick, so
+    #                         there is no scan of latency
+    #   Y0 falls     t=500ms  X1 event, same rule
+    #   Y0 True      200..490ms            = 30 scans
+    #   Y0 False     10..190, 500..700ms   = 19 + 21 = 40 scans
+    SCAN_PERIOD_MS = 10
+    trace = export_sim_trace(scenario, logic, max_time_ms=700,
+                             step_ms=SCAN_PERIOD_MS)
 
     print(f"\nTrace captured: {len(trace)} ticks")
     print("\nTrace entries:")
@@ -131,8 +142,19 @@ if __name__ == "__main__":
     # --- Assertions ---
     print("\n--- Assertions ---")
 
-    assert len(trace) == 7,                     "7 ticks (100ms to 700ms)"
-    print(f"  PASS — {len(trace)} ticks captured")
+    assert len(trace) == 70,        "70 scans (10ms to 700ms @ 10ms)"
+    print(f"  PASS — {len(trace)} scans captured "
+          f"(700ms / {SCAN_PERIOD_MS}ms)")
+
+    # Edge timing, derived above — these are the numbers that make the
+    # entry count meaningful rather than just larger.
+    rise = next(e["time"] for e in trace if e["outputs"].get("Y0"))
+    fall = next(e["time"] for e in trace
+                if e["time"] > rise and not e["outputs"].get("Y0"))
+    assert rise == 200, f"Y0 must rise on the X0 event tick, got {rise}"
+    assert fall == 500, f"Y0 must fall on the X1 event tick, got {fall}"
+    print(f"  PASS — Y0 rises t={rise}ms, falls t={fall}ms "
+          f"(0 scans latency; events precede the scan)")
 
     # Before start command: Y0 should be False
     t100 = next(e for e in trace if e["time"] == 100)

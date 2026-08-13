@@ -679,21 +679,37 @@ if __name__ == "__main__":
     print_alignment(result1)
 
     # -------------------------------------------------------
-    # Test 2: real trace offset by +25ms
+    # Test 2: uniformly offset real trace
+    #
+    # The golden is now sampled at the 10ms scan period, which bounds
+    # how large a uniform offset can be and still mean what this test
+    # intends. An offset must stay under HALF the sample spacing
+    # (< 5ms), or each real entry is nearer its neighbour's sim entry
+    # than its own and the correct pairing shifts — steal-back would
+    # then rewrite the alignment and no pair would show the offset.
+    #
+    #   offset +3ms, spacing 10ms:
+    #     sim t -> real t+3   delta 3
+    #     next sim t+10       delta 7  -> no steal-back, pairing holds
     # -------------------------------------------------------
-    print("\nTest 2 — Real trace offset by +25ms (tolerance 50ms):")
+    SCAN_PERIOD_MS = 10
+    OFFSET_MS      = 3
+
+    print(f"\nTest 2 — Real trace offset by +{OFFSET_MS}ms "
+          f"(tolerance 1 scan = {SCAN_PERIOD_MS}ms):")
     real_trace_offset = [
-        {"time": e["time"] + 25, "signals": e["signals"]}
+        {"time": e["time"] + OFFSET_MS, "signals": e["signals"]}
         for e in real_trace_exact
     ]
-    result2 = align_traces(sim_trace, real_trace_offset, tolerance_ms=50)
+    result2 = align_traces(sim_trace, real_trace_offset, tolerance_ms=None,
+                           scan_period_ms=SCAN_PERIOD_MS, tolerance_scans=1)
     print_alignment(result2)
 
     # -------------------------------------------------------
     # Test 3: tolerance too tight
     # -------------------------------------------------------
-    print("\nTest 3 — Same offset, tolerance 10ms (too tight):")
-    result3 = align_traces(sim_trace, real_trace_offset, tolerance_ms=10)
+    print(f"\nTest 3 — Same offset, tolerance 1ms (too tight):")
+    result3 = align_traces(sim_trace, real_trace_offset, tolerance_ms=1)
     print_alignment(result3)
 
     # -------------------------------------------------------
@@ -887,24 +903,34 @@ if __name__ == "__main__":
     # -------------------------------------------------------
     print("\n--- Assertions ---")
 
-    assert result1["total_aligned"]    == 7, "perfect: all 7 aligned"
+    N_SCANS = len(sim_trace)                # 70 = 700ms / 10ms scan
+    assert N_SCANS == 70, f"golden is 70 scans, got {N_SCANS}"
+    assert result1["total_aligned"]    == N_SCANS, "perfect: all aligned"
     assert len(result1["unmatched_sim"])  == 0
     assert len(result1["unmatched_real"]) == 0
-    print("  PASS — Test 1: perfect alignment, 7/7 matched")
+    print(f"  PASS — Test 1: perfect alignment, {N_SCANS}/{N_SCANS} matched")
 
-    assert result2["total_aligned"]    == 7, "offset: all 7 aligned"
+    assert result2["total_aligned"]    == N_SCANS, "offset: all aligned"
+    assert result2["tolerance_ms"] == SCAN_PERIOD_MS, "1 scan of tolerance"
     for pair in result2["aligned"]:
-        assert pair["offset_ms"] == 25, "all offsets must be +25ms"
-    print("  PASS — Test 2: offset alignment, all offsets = +25ms")
+        assert pair["offset_ms"] == OFFSET_MS, \
+            f"all offsets must be +{OFFSET_MS}ms"
+    assert result2["offsets"]["constant_offset_suspected"] is True, \
+        "a uniform offset present from the first pair is a clock skew"
+    assert result2["offsets"]["cascade_suspected"] is False, \
+        "and must not be mistaken for a cascade"
+    print(f"  PASS — Test 2: offset alignment, all offsets = "
+          f"+{OFFSET_MS}ms, reported as skew not cascade")
 
     assert result3["total_aligned"]    == 0, "tight: 0 aligned"
-    assert len(result3["unmatched_sim"]) == 7
-    print("  PASS — Test 3: tight tolerance, 0/7 matched")
+    assert len(result3["unmatched_sim"]) == N_SCANS
+    print(f"  PASS — Test 3: tight tolerance, 0/{N_SCANS} matched")
 
-    assert result4["total_aligned"]    == 6, "missing: 6 aligned"
+    assert result4["total_aligned"]    == N_SCANS - 1, "missing: one short"
     assert len(result4["unmatched_sim"]) == 1
     assert result4["unmatched_sim"][0]["time"] == 300
-    print("  PASS — Test 4: missing entry, t=300ms unmatched")
+    print(f"  PASS — Test 4: missing entry, {N_SCANS - 1}/{N_SCANS} "
+          f"matched, t=300ms unmatched")
 
     assert tol_1scan == 10,  "1 scan @10ms = 10ms"
     assert tol_2scan == 25,  "2 scans @10ms + 5ms delay = 25ms"
@@ -917,14 +943,14 @@ if __name__ == "__main__":
     print("  PASS — Test 5: tolerance derives from scan cycles")
 
     assert res_scan["provenance_real"] == TS_SCAN
-    assert res_scan["total_aligned"]   == 7, "scan timestamps align exactly"
+    assert res_scan["total_aligned"] == N_SCANS, "scan timestamps align exactly"
     assert refused is not None, "tolerance 0 on arrival must raise"
     assert "arrival" in refused
     assert res_arr["tolerance_ms"] == 10
-    assert res_arr["total_aligned"] == 7
+    assert res_arr["total_aligned"] == N_SCANS
     assert any(TS_UNKNOWN in w for w in bare["warnings"]), \
         "bare list must warn about unknown provenance"
-    assert bare["total_aligned"] == 7, "bare list still aligns (permissive)"
+    assert bare["total_aligned"] == N_SCANS, "bare list still aligns"
     print("  PASS — Test 6: provenance refused tolerance 0 on arrival, "
           "warned on unknown, allowed on scan")
 
@@ -932,7 +958,7 @@ if __name__ == "__main__":
     assert len(res_dupes["warnings"]) >= 1, "duplicates must warn"
     print("  PASS — Test 7: duplicates counted and warned, never raised")
 
-    assert compressed["total_entries"] == 7
+    assert compressed["total_entries"] == N_SCANS
     assert compressed["kept_entries"] < compressed["total_entries"], \
         "compression must drop steady-state ticks"
     assert compressed["entries"][0]["time"] == sim_trace[0]["time"], \

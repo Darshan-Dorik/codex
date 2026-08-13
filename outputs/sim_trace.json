@@ -1,6 +1,186 @@
 [
   {
+    "time": 10,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 20,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 30,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 40,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 50,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 60,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 70,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 80,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 90,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
     "time": 100,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 110,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 120,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 130,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 140,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 150,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 160,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 170,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 180,
+    "inputs": {
+      "X0": false,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 190,
     "inputs": {
       "X0": false,
       "X1": false
@@ -20,7 +200,187 @@
     }
   },
   {
+    "time": 210,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 220,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 230,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 240,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 250,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 260,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 270,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 280,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 290,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
     "time": 300,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 310,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 320,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 330,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 340,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 350,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 360,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 370,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 380,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 390,
     "inputs": {
       "X0": true,
       "X1": false
@@ -40,6 +400,96 @@
     }
   },
   {
+    "time": 410,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 420,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 430,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 440,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 450,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 460,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 470,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 480,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
+    "time": 490,
+    "inputs": {
+      "X0": true,
+      "X1": false
+    },
+    "outputs": {
+      "Y0": true
+    }
+  },
+  {
     "time": 500,
     "inputs": {
       "X0": true,
@@ -50,7 +500,187 @@
     }
   },
   {
+    "time": 510,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 520,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 530,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 540,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 550,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 560,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 570,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 580,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 590,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
     "time": 600,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 610,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 620,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 630,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 640,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 650,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 660,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 670,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 680,
+    "inputs": {
+      "X0": true,
+      "X1": true
+    },
+    "outputs": {
+      "Y0": false
+    }
+  },
+  {
+    "time": 690,
     "inputs": {
       "X0": true,
       "X1": true

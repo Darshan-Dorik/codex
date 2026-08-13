@@ -41,12 +41,22 @@ Every module carries its own test suite in an `if __name__ == "__main__":` block
 Because modules import each other **flat** (`from st_parser import parse_st`, not `from src.core.st_parser import ...`) and there are no `__init__.py` files, most `src/` modules cannot be run directly. Set the path first:
 
 ```bash
-export PYTHONPATH=.:src/core:src/testing:src/batch:src/analysis:src/ai:src/bridge
+export PYTHONPATH=.:src/core:src/testing:src/batch:src/analysis:src/ai:src/bridge:src/shim
 python3 src/testing/test_harness.py     # single module's self-test
 python3 src/bridge/trace_diff.py
 ```
 
 `src/core/plc.py`, `src/core/loom.py`, and `tool/*.py` set up `sys.path` themselves and run bare. `tool/orchestrator.py` is the canonical example of the path-injection preamble to copy when adding a new entry point.
+
+### Two rates: physics vs scan
+
+`sim_step_ms` integrates the twin's physics; `scan_period_ms` is how often the PLC samples it. They are **not** the same knob, and `TwinRuntime` enforces a 10:1 minimum ratio — if they are equal the PLC sees every physics update and **no sub-scan event can exist**, which is the whole point of the split. A sensor pulse narrower than one scan can then rise and fall unseen, exactly as on a real controller (`twin_runtime.py` Test 4 demonstrates a 5ms pulse missed 10 times out of 10 at a 10ms scan).
+
+Defaults are `sim_step_ms=1` / `scan_period_ms=10`. Real loom PLCs scan at 5–20ms; the old `step_ms=100` was a simulation convenience, never a modelled scan period.
+
+**Traces record at scan rate, not sim rate.** A 7-day soak is ~60M entries at 10ms and ~600M at 1ms, and recording at sim rate would also claim observations the controller never made.
+
+`TestHarness` accepts `scan_period_ms`/`sim_step_ms` but defaults to single-rate (`step_ms`), because its `LoomState` is a linear integrator — sub-stepping it is numerically identical. The distinction only bites when a `wiring` callback drives `loom_twin`.
 
 ### Symbols are program-scoped
 
@@ -91,6 +101,7 @@ The pipeline suppresses per-tick stdout by swapping `sys.stdout` for a `StringIO
 | `src/analysis/` | `aggregator`, `coverage_gap`, `log_filter` (timeline compression), `analysis_payload` / `export_analysis` (build the JSON the AI layer consumes) |
 | `src/ai/` | `ollama_client` (stdlib `urllib` → `/api/generate`), `prompt_builder`, `prompt_limiter` (token budget), `failure_explainer` / `coverage_analyzer` / `scenario_suggester` / `safety_analyzer`, `ai_report` (fans out to all four), `prompt_snapshot` (audit trail of prompts sent) |
 | `src/bridge/` | **Standalone, not wired into the CLI.** Compares simulation traces against real-machine traces: `io_map` (program-scoped), `sim_trace` / `real_trace` / `trace_recorder`, `real_adapter` (currently a mock), `trace_aligner` (two-pointer matching + offset diagnostics), `trace_diff` (ticks / transitions modes), `mismatch_report`, `readable_report`, `comparison_export` |
+| `src/shim/` | `twin_runtime` — PLC + `loom_twin` in a **closed loop** at two rates (physics 1ms, PLC scan 10ms). The bench-simulator core: this is what makes Y outputs exist for a collector to poll. |
 | `loom_twin.py` | High-fidelity twin: `MotorStateMachine` (startup/stop delays), `CyclicShuttleModel`, `PositionSensor`, `DelayedSensor` (delay + miss-every-n noise) |
 | `calibration.py` | Measure the twin, compare to real-world targets, iteratively adjust profile parameters, drift detection, `ProfileRegistry`, calibrated-model save/load |
 

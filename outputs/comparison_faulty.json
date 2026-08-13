@@ -44,9 +44,236 @@
       "description": "Fault indicator lamp"
     }
   },
+  "io_map_manifest": {
+    "program": null,
+    "signals": {
+      "X0": {
+        "name": "Start Button",
+        "type": "input",
+        "unit": "bool",
+        "description": "Operator start command"
+      },
+      "X1": {
+        "name": "Fault Sensor",
+        "type": "input",
+        "unit": "bool",
+        "description": "General fault / emergency stop input"
+      },
+      "X2": {
+        "name": "Jam Sensor",
+        "type": "input",
+        "unit": "bool",
+        "description": "Shuttle jam detection sensor"
+      },
+      "X3": {
+        "name": "Position Sensor",
+        "type": "input",
+        "unit": "bool",
+        "description": "Shuttle position threshold sensor"
+      },
+      "Y0": {
+        "name": "Main Motor",
+        "type": "output",
+        "unit": "bool",
+        "description": "Main drive motor enable"
+      },
+      "Y1": {
+        "name": "Position Indicator",
+        "type": "output",
+        "unit": "bool",
+        "description": "Position reached indicator lamp"
+      },
+      "Y2": {
+        "name": "Fault Lamp",
+        "type": "output",
+        "unit": "bool",
+        "description": "Fault indicator lamp"
+      }
+    }
+  },
   "sim_trace": [
     {
+      "time": 10,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 20,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 30,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 40,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 50,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 60,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 70,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 80,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 90,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
       "time": 100,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 110,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 120,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 130,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 140,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 150,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 160,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 170,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 180,
+      "inputs": {
+        "X0": false,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 190,
       "inputs": {
         "X0": false,
         "X1": false
@@ -66,7 +293,187 @@
       }
     },
     {
+      "time": 210,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 220,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 230,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 240,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 250,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 260,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 270,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 280,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 290,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
       "time": 300,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 310,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 320,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 330,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 340,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 350,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 360,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 370,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 380,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 390,
       "inputs": {
         "X0": true,
         "X1": false
@@ -86,6 +493,96 @@
       }
     },
     {
+      "time": 410,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 420,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 430,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 440,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 450,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 460,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 470,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 480,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
+      "time": 490,
+      "inputs": {
+        "X0": true,
+        "X1": false
+      },
+      "outputs": {
+        "Y0": true
+      }
+    },
+    {
       "time": 500,
       "inputs": {
         "X0": true,
@@ -96,7 +593,187 @@
       }
     },
     {
+      "time": 510,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 520,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 530,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 540,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 550,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 560,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 570,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 580,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 590,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
       "time": 600,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 610,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 620,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 630,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 640,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 650,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 660,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 670,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 680,
+      "inputs": {
+        "X0": true,
+        "X1": true
+      },
+      "outputs": {
+        "Y0": false
+      }
+    },
+    {
+      "time": 690,
       "inputs": {
         "X0": true,
         "X1": true
@@ -118,7 +795,151 @@
   ],
   "real_trace": [
     {
+      "time": 10,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 20,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 30,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 40,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 50,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 60,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 70,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 80,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 90,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
       "time": 100,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 110,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 120,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 130,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 140,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 150,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 160,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 170,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 180,
+      "signals": {
+        "X0": false,
+        "X1": false,
+        "Y0": false
+      }
+    },
+    {
+      "time": 190,
       "signals": {
         "X0": false,
         "X1": false,
@@ -134,7 +955,151 @@
       }
     },
     {
+      "time": 210,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 220,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 230,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 240,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 250,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 260,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 270,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 280,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 290,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
       "time": 300,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 310,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 320,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 330,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 340,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 350,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 360,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 370,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 380,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 390,
       "signals": {
         "X0": true,
         "X1": false,
@@ -150,6 +1115,78 @@
       }
     },
     {
+      "time": 410,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 420,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 430,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 440,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 450,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 460,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 470,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 480,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
+      "time": 490,
+      "signals": {
+        "X0": true,
+        "X1": false,
+        "Y0": true
+      }
+    },
+    {
       "time": 500,
       "signals": {
         "X0": true,
@@ -158,11 +1195,155 @@
       }
     },
     {
+      "time": 510,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 520,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 530,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 540,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 550,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 560,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 570,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 580,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 590,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
       "time": 600,
       "signals": {
         "X0": true,
         "X1": true,
         "Y0": true
+      }
+    },
+    {
+      "time": 610,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 620,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 630,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 640,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 650,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 660,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 670,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 680,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
+      }
+    },
+    {
+      "time": 690,
+      "signals": {
+        "X0": true,
+        "X1": true,
+        "Y0": false
       }
     },
     {
@@ -190,8 +1371,8 @@
   ],
   "summary": {
     "total_mismatches": 2,
-    "total_compared": 21,
-    "mismatch_rate": 9.5,
+    "total_compared": 210,
+    "mismatch_rate": 1.0,
     "signals": {
       "Y0": {
         "count": 2,
@@ -221,7 +1402,29 @@
       "At 500ms: Main Motor expected OFF but was ON",
       "At 600ms: Main Motor expected OFF but was ON"
     ],
-    "summary": "2 mismatch(es) detected (9.5%) between t=500ms and t=600ms. Affected signals: Main Motor.",
-    "has_mismatches": true
-  }
+    "summary": "2 mismatch(es) detected (1.0%) between t=500ms and t=600ms. Affected signals: Main Motor.",
+    "has_mismatches": true,
+    "program": null,
+    "io_map_program": null,
+    "warnings": [
+      "build_readable_report: neither the trace nor the IO map declares a program \u2014 symbol meanings are unverified"
+    ]
+  },
+  "offsets": {
+    "count": 70,
+    "nonzero_offset_pairs": 0,
+    "min_ms": 0,
+    "max_ms": 0,
+    "mean_ms": 0,
+    "stdev_ms": 0.0,
+    "first_divergence_time": null,
+    "cascade_suspected": false,
+    "constant_offset_suspected": false
+  },
+  "warnings": [
+    "build_comparison_package: trace declares program programs/motor_start.st, but the IO map is unscoped \u2014 labels are unverified",
+    "sim trace declares no timestamp provenance; assuming unknown",
+    "real trace declares no timestamp provenance; assuming unknown"
+  ],
+  "trustworthy": true
 }

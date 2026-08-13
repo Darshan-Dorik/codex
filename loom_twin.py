@@ -272,31 +272,63 @@ class DelayedSensor:
     """
 
     def __init__(self, threshold=180.0, window=20.0,
-                 delay_ms=0, step_ms=100, miss_every_n=0):
+                 delay_ms=0, sim_step_ms=1, miss_every_n=0,
+                 step_ms=None):
         """
         Args:
             threshold    : float — position where sensor activates
             window       : float — active zone width
-            delay_ms     : int   — output delay in ms (must be multiple of step_ms)
-            step_ms      : int   — simulation tick size (needed for buffer sizing)
+            delay_ms     : int   — output delay in ms; MUST be an exact
+                           multiple of sim_step_ms
+            sim_step_ms  : int   — PHYSICS integration step, not the PLC
+                           scan period. This sensor is a physics-layer
+                           object: it is updated every time the shuttle
+                           moves, which is finer than the rate the PLC
+                           samples it at.
             miss_every_n : int   — suppress every Nth activation (0 = no misses)
+            step_ms      : int   — DEPRECATED alias for sim_step_ms
+
+        Raises:
+            ValueError — if delay_ms is not an exact multiple of
+            sim_step_ms. The buffer length is delay_ms // sim_step_ms,
+            so an indivisible delay used to truncate silently: a 50ms
+            delay at a 100ms step became NO delay at all, and the
+            resulting trace looked plausible. Failing at construction
+            makes that a load-time break instead.
         """
+        if step_ms is not None:
+            sim_step_ms = step_ms
+
+        if sim_step_ms <= 0:
+            raise ValueError(f"sim_step_ms must be positive, got {sim_step_ms}")
+
+        if delay_ms % sim_step_ms != 0:
+            raise ValueError(
+                f"DelayedSensor delay_ms={delay_ms} is not a multiple of "
+                f"sim_step_ms={sim_step_ms}: the delay buffer would "
+                f"truncate to {delay_ms // sim_step_ms} step(s) "
+                f"({(delay_ms // sim_step_ms) * sim_step_ms}ms) and the "
+                f"remaining {delay_ms % sim_step_ms}ms would vanish "
+                f"silently."
+            )
+
         self.threshold    = threshold
         self.window       = window
         self.delay_ms     = delay_ms
-        self.step_ms      = step_ms
+        self.sim_step_ms  = sim_step_ms
+        self.step_ms      = sim_step_ms   # legacy attribute name
         self.miss_every_n = miss_every_n
 
         # Internal position sensor
         self._sensor = PositionSensor(threshold, window)
 
         # Delay buffer: stores raw sensor states, oldest first
-        # Buffer length = delay_ms / step_ms  → exactly delay_ms lag
+        # Buffer length = delay_ms / sim_step_ms  → exactly delay_ms lag
         # When delay_ms=0, buf_len=1 means 1-tick lag — use 0 for instant
         if delay_ms == 0:
             buf_len = 0
         else:
-            buf_len = max(1, delay_ms // step_ms)
+            buf_len = max(1, delay_ms // sim_step_ms)
         self._buffer = [False] * buf_len
 
         # Missed trigger tracking
