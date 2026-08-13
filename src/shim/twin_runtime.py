@@ -436,19 +436,32 @@ if __name__ == "__main__":
     # -------------------------------------------------------
     print("\nTest 6 — Jam stops the motor via Y0, not directly:")
     rt6 = make_runtime()
-    trace6 = rt6.run_until(30000)
+    scans6 = []
+    while rt6.t_ms < 30000:
+        if rt6.step():
+            s = rt6.snapshot()
+            scans6.append({
+                "time":          s["time"],
+                "X0":            s["sensors"]["X0"],
+                "X2":            s["sensors"]["X2"],
+                "Y0":            s["outputs"].get("Y0"),
+                "motor_running": s["motor_running"],
+            })
 
-    jam_rise = next(e for e in trace6 if e["inputs"]["X2"])
-    y0_drop  = next(e for e in trace6
-                    if e["time"] > jam_rise["time"] and not e["outputs"]["Y0"])
-    print(f"  X2 (jam) rises at  : t={jam_rise['time']}ms")
-    print(f"  Y0 (motor) drops at: t={y0_drop['time']}ms")
-    print(f"  overrun            : "
-          f"{y0_drop['time'] - jam_rise['time']}ms "
-          f"= {(y0_drop['time'] - jam_rise['time']) // rt6.scan_period_ms} "
-          f"scan period(s)")
-    print(f"  X0 during jam      : {jam_rise['inputs']['X0']} "
-          f"(stays asserted — the twin no longer cheats)")
+    i_jam    = next(i for i, s in enumerate(scans6) if s["X2"])
+    jam_scan = scans6[i_jam]
+    next_scan = scans6[i_jam + 1]
+
+    print(f"  {'t':>9}  {'X0':>6} {'X2':>6} {'Y0':>6}  motor_running")
+    for s in scans6[i_jam - 1:i_jam + 3]:
+        print(f"  {s['time']:>7}ms  {str(s['X0']):>6} {str(s['X2']):>6} "
+              f"{str(s['Y0']):>6}  {s['motor_running']}")
+    print("  Y0 falls in the SAME scan X2 is sampled — the PLC samples and")
+    print("  evaluates within one scan, so the logic adds no latency.")
+    print("  motor_running still reads True in that scan: physics for the")
+    print("  step already ran before the scan committed the new command, so")
+    print("  the motor turns over 1 sim step later and the change is first")
+    print(f"  VISIBLE one scan ({rt6.scan_period_ms}ms) on.")
 
     # -------------------------------------------------------
     # Assertions
@@ -482,13 +495,21 @@ if __name__ == "__main__":
     assert a == b, "runtime must be deterministic"
     print(f"  PASS — Test 5: {len(a)} scans identical across two runs")
 
-    overrun = y0_drop["time"] - jam_rise["time"]
-    assert overrun == rt6.scan_period_ms, \
-        f"motor must overrun by exactly one scan, got {overrun}ms"
-    assert jam_rise["inputs"]["X0"] is True, \
-        "X0 must stay asserted during a jam"
-    print(f"  PASS — Test 6: {overrun}ms overrun = 1 scan period, "
-          f"X0 stays asserted")
+    assert jam_scan["Y0"] is False, \
+        "Y0 must fall in the same scan X2 is sampled — the PLC samples " \
+        "and evaluates within one scan, so there is no logic latency"
+    assert jam_scan["motor_running"] is True, \
+        "motor_running still reads True in that scan: its physics ran " \
+        "before the scan committed the command"
+    assert next_scan["motor_running"] is False, \
+        "and must have dropped by the following scan"
+    assert next_scan["time"] - jam_scan["time"] == rt6.scan_period_ms
+    assert jam_scan["X0"] is True, \
+        "X0 must stay asserted during a jam — the open-loop twin dropped " \
+        "X0 itself, which was it cheating"
+    print(f"  PASS — Test 6: Y0 falls same-scan (t={jam_scan['time']}ms); "
+          f"motor visibly stops one scan later "
+          f"(t={next_scan['time']}ms); X0 stays asserted")
 
     # DelayedSensor divisibility, asserted against sim_step_ms
     div_err = None

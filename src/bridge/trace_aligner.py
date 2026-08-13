@@ -681,19 +681,35 @@ if __name__ == "__main__":
     # -------------------------------------------------------
     # Test 2: uniformly offset real trace
     #
-    # The golden is now sampled at the 10ms scan period, which bounds
-    # how large a uniform offset can be and still mean what this test
-    # intends. An offset must stay under HALF the sample spacing
-    # (< 5ms), or each real entry is nearer its neighbour's sim entry
-    # than its own and the correct pairing shifts — steal-back would
-    # then rewrite the alignment and no pair would show the offset.
+    # CONSTRAINT — READ BEFORE CHANGING THE SCAN PERIOD
     #
-    #   offset +3ms, spacing 10ms:
+    #     OFFSET_MS must stay STRICTLY BELOW half the sample spacing.
+    #
+    # This test asserts that every aligned pair shows exactly
+    # +OFFSET_MS. That is only the correct pairing while each real
+    # entry is nearer its OWN sim entry than its neighbour's. Past
+    # half the spacing the nearest sim entry becomes the next one, the
+    # correct pairing shifts by a sample, steal-back rewrites the
+    # alignment accordingly, and the test measures something else
+    # entirely — while still passing if the numbers happen to line up.
+    #
+    # This premise has now been implicit twice. It is stated here so a
+    # future rate change invalidates it loudly rather than silently:
+    #
+    #     spacing 100ms, offset +25ms  ->  25 <  50   OK  (original)
+    #     spacing  10ms, offset +25ms  ->  25 >   5   BROKEN
+    #     spacing  10ms, offset  +3ms  ->   3 <   5   OK  (current)
+    #
+    # Current derivation at 10ms spacing:
     #     sim t -> real t+3   delta 3
     #     next sim t+10       delta 7  -> no steal-back, pairing holds
     # -------------------------------------------------------
     SCAN_PERIOD_MS = 10
     OFFSET_MS      = 3
+    assert OFFSET_MS * 2 < SCAN_PERIOD_MS, (
+        f"OFFSET_MS={OFFSET_MS} must be strictly below half the sample "
+        f"spacing ({SCAN_PERIOD_MS / 2}ms), or the correct pairing shifts "
+        f"by a sample and this test no longer measures a uniform offset")
 
     print(f"\nTest 2 — Real trace offset by +{OFFSET_MS}ms "
           f"(tolerance 1 scan = {SCAN_PERIOD_MS}ms):")

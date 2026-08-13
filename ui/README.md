@@ -1,16 +1,88 @@
-# React + Vite
+# Loom Twin Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + react-three-fiber front end for the circular loom twin.
 
-Currently, two official plugins are available:
+```bash
+python3 ui/api_server.py          # backend on :5174
+cd ui && npm install && npm run dev
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+`api_server.py` is a thin HTTP frontend over
+`src/shim/twin_runtime.TwinRuntime`. It runs no simulation of its own —
+the runtime owns the only mutable state and hands out immutable
+snapshots, so the dashboard, the Modbus shim and anything else read the
+same PLC scan.
 
-## React Compiler
+## Two behaviours that look like bugs and are not
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The twin used to run **open-loop**: `api_server.py` commanded the motor
+directly and injected a jam on a timer, and no PLC existed anywhere —
+so there were no `Y` outputs at all. The PLC is now in the loop:
 
-## Expanding the ESLint configuration
+```
+twin sensors ──► PLC inputs ──► PLC.scan() ──► PLC outputs ──► motor
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+running `programs/shuttle_control.st` (`Y0 := X0 AND NOT X2`,
+`Y1 := X1`). Two visible behaviours changed as a result. **Both are
+intended. Please do not "fix" either.**
+
+### 1. X0 stays TRUE during a jam
+
+Before, the jam was implemented by dropping `X0`. That was the twin
+cheating: `X0` is the operator's **run command**, and nothing about a
+jam withdraws it. A real machine jams while the operator is still
+asking it to run — that is the entire situation.
+
+Now `X2` (jam) rises, the PLC evaluates `Y0 := X0 AND NOT X2`, and
+`Y0` falls. `X0` stays asserted throughout, which is why the sensor
+panel keeps showing X0 lit during a jam.
+
+### 2. The motor reads "running" for one more scan after the jam
+
+```
+        t      X0     X2     Y0   motor_running
+  12310ms    True  False   True   True
+  12320ms    True   True  False   True     <-- jam is up, motor still True
+  12330ms    True   True  False   False
+```
+
+`Y0` falls in the **same scan** `X2` is sampled — the PLC samples its
+inputs and evaluates them within one scan, so the logic adds no
+latency at all. But that scan's physics already ran before the scan
+committed the new motor command, so `motor_running` is still `True` in
+that snapshot and turns over on the next one.
+
+At the default 10ms scan period that is a 10ms window where the jam
+banner is up and the motor still reads as running. It is one scan of
+observation lag, not a missed stop.
+
+## Rates
+
+The runtime integrates physics at `sim_step_ms=1` and scans the PLC at
+`scan_period_ms=10`. They are deliberately different: if they were
+equal the PLC would see every physics update and no sub-scan event
+could exist, so a sensor pulse narrower than one scan could never be
+missed — which real controllers do all the time. See
+`src/shim/twin_runtime.py`.
+
+Real loom PLCs scan at 5–20ms. The previous `step_ms=100` was a
+simulation convenience, never a modelled scan period.
+
+## State contract
+
+```jsonc
+{
+  "time": 1970,                 // ms, PLC scan time
+  "motor_running": true,
+  "shuttle_position": 99.6,     // degrees, 0-360
+  "sensors": { "X0": true, "X1": false, "X2": false },
+  "jam_detected": false,
+
+  // additive; the dashboard reads the five keys above
+  "outputs": { "Y0": true, "Y1": false },
+  "motor_state": "RUNNING",     // STOPPED|STARTING|RUNNING|STOPPING
+  "scan_count": 197,
+  "cycles_completed": 0
+}
+```

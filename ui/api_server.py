@@ -1,113 +1,75 @@
 """
-ui/api_server.py — Mock PLC State API Server
+ui/api_server.py — Machine State API Server
 
-Serves GET /state with simulated machine state.
-Runs the loom twin simulation in a background loop and exposes
-the current state as JSON.
+Serves GET /state with the loom twin's current state, for the React
+dashboard.
+
+This is now a thin HTTP frontend over src/shim/twin_runtime.TwinRuntime.
+It owns no simulation of its own: the runtime holds the only mutable
+state and hands out immutable snapshots, so this handler, the Modbus
+server and anything else read the SAME scan.
 
 Usage:
     python ui/api_server.py
 
 Endpoint:
-    GET http://localhost:5000/state
+    GET http://localhost:5174/state
     Response: {
-      "time": int,
+      "time": int,                 # ms, PLC scan time
       "motor_running": bool,
       "shuttle_position": float,   # 0-360 degrees
       "sensors": { "X0": bool, "X1": bool, "X2": bool },
-      "jam_detected": bool
+      "jam_detected": bool,
+
+      # additive — the dashboard reads the five keys above
+      "outputs": { "Y0": bool, "Y1": bool },
+      "motor_state": str,          # STOPPED|STARTING|RUNNING|STOPPING
+      "scan_count": int,
+      "cycles_completed": int
     }
+
+WHAT CHANGED, AND WHY IT IS NOT A BUG
+-------------------------------------
+This server used to run the twin OPEN-loop: it commanded the motor
+directly and injected a jam on a timer, with no PLC anywhere. Two
+visible behaviours changed when the PLC went into the loop. Both are
+intended. See ui/README.md.
+
+  1. X0 STAYS TRUE DURING A JAM.
+     Previously the jam was implemented by dropping X0 — the run
+     command itself. That is not what a jam is. X0 is the operator's
+     run command and nothing about a jam withdraws it. Now X2 (jam)
+     rises, the PLC evaluates Y0 := X0 AND NOT X2, and Y0 falls.
+
+  2. THE MOTOR READS "RUNNING" FOR ONE MORE SCAN AFTER THE JAM.
+     Y0 falls in the same scan X2 is sampled, so the logic adds no
+     latency. But that scan's physics already ran before the scan
+     committed the new command, so motor_running is still True in the
+     snapshot and turns over on the next one — 10ms at the default
+     scan period.
 """
 
-import sys
 import os
+import sys
 import json
-import threading
-import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# Add project root to path
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, _ROOT)
-sys.path.insert(0, os.path.join(_ROOT, "src/core"))
+for _sub in ("", "src/core", "src/shim"):
+    _p = os.path.join(_ROOT, _sub) if _sub else _ROOT
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
-from loom_twin import MotorStateMachine, CyclicShuttleModel, PositionSensor
+from twin_runtime import make_runtime
 
-# ---------------------------------------------------------------------------
-# Simulation state (shared between sim thread and HTTP handler)
-# ---------------------------------------------------------------------------
+# The runtime is created at startup and read-only from here on.
+_runtime = None
 
-_state = {
-    "time":             0,
-    "motor_running":    False,
-    "shuttle_position": 0.0,
-    "sensors":          {"X0": False, "X1": False, "X2": False},
-    "jam_detected":     False
-}
-_state_lock = threading.Lock()
-
-# ---------------------------------------------------------------------------
-# Simulation loop
-# ---------------------------------------------------------------------------
-
-def simulation_loop():
-    """Run the loom twin in a background thread, updating _state."""
-    motor   = MotorStateMachine(startup_delay_ms=300, stop_delay_ms=200)
-    shuttle = CyclicShuttleModel(speed_units_per_sec=60.0, cycle_length=360.0)
-    sensor  = PositionSensor(threshold=180.0, window=20.0)
-
-    t_ms        = 0
-    step_ms     = 100
-    jam_at_ms   = None   # will be set after 2 full cycles
-
-    # Start motor
-    motor.command(True)
-
-    while True:
-        t_ms += step_ms
-
-        # Inject jam after 2 full cycles (~12s), clear after 3s
-        if shuttle.cycles_completed >= 2 and jam_at_ms is None:
-            jam_at_ms = t_ms
-
-        jam_active = (jam_at_ms is not None and
-                      t_ms >= jam_at_ms and
-                      t_ms < jam_at_ms + 3000)
-
-        # Motor stops on jam
-        if jam_active:
-            motor.command(False)
-        elif jam_at_ms is not None and t_ms >= jam_at_ms + 3000:
-            # Restart after jam clears
-            motor.command(True)
-            jam_at_ms = None
-
-        motor.update(t_ms)
-        shuttle.update(t_ms, motor.is_running)
-        sensor_active = sensor.update(shuttle.position)
-
-        with _state_lock:
-            _state["time"]             = t_ms
-            _state["motor_running"]    = motor.is_running
-            _state["shuttle_position"] = round(shuttle.position, 2)
-            _state["sensors"]          = {
-                "X0": motor.command_on,
-                "X1": sensor_active,
-                "X2": jam_active
-            }
-            _state["jam_detected"] = jam_active
-
-        time.sleep(step_ms / 1000.0)
-
-# ---------------------------------------------------------------------------
-# HTTP handler
-# ---------------------------------------------------------------------------
 
 class StateHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/state":
-            with _state_lock:
-                body = json.dumps(_state).encode()
+            body = json.dumps(_runtime.snapshot()).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
@@ -122,18 +84,17 @@ class StateHandler(BaseHTTPRequestHandler):
         pass   # suppress request logs
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
 if __name__ == "__main__":
-    # Start simulation in background thread
-    sim_thread = threading.Thread(target=simulation_loop, daemon=True)
-    sim_thread.start()
+    _runtime = make_runtime()
+    _runtime.start_thread()
 
     host, port = "localhost", 5174
     server = HTTPServer((host, port), StateHandler)
-    print(f"PLC State API running at http://{host}:{port}/state")
+    print(f"Machine State API running at http://{host}:{port}/state")
+    print(f"  program      : {_runtime.program}")
+    print(f"  scan period  : {_runtime.scan_period_ms}ms")
+    print(f"  physics step : {_runtime.sim_step_ms}ms "
+          f"({_runtime.rate_ratio}:1)")
     print("Press Ctrl+C to stop.")
     try:
         server.serve_forever()
