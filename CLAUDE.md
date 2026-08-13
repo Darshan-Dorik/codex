@@ -58,6 +58,14 @@ Defaults are `sim_step_ms=1` / `scan_period_ms=10`. Real loom PLCs scan at 5–2
 
 `TestHarness` accepts `scan_period_ms`/`sim_step_ms` but defaults to single-rate (`step_ms`), because its `LoomState` is a linear integrator — sub-stepping it is numerically identical. The distinction only bites when a `wiring` callback drives `loom_twin`.
 
+### The Modbus shim is read-only structurally, not by policy
+
+`src/shim/modbus_server.py` implements **only** FC3 and FC4. `WRITE_FUNCTION_CODES` is asserted disjoint from `READ_FUNCTION_CODES` at import and again in the tests, and all eight write function codes fall through the same default branch to exception `0x01`. There is no write path to audit or trust — that is the platform brief's passive-only assertion done as a property rather than a claim. Don't add a write code "for testing".
+
+FC3 is served as an alias of FC4 because real drives expose process data as holding registers (the Delta MS300 profile reads `0x2103` that way), so a collector written against real hardware works against the bench target unchanged.
+
+Registers 0–1 carry the twin's **own scan time**. A collector that records that as its trace timestamp gets traces that align against sim traces at `tolerance_ms=0`; one that stamps on arrival needs a tolerance window forever. See `modbus_collector.py`.
+
 ### Symbols are program-scoped
 
 `X1` is the **fault sensor** in `programs/motor_start.st` and the **position sensor** in `programs/shuttle_control.st`. A symbol has no meaning without knowing which ST program produced the trace, so `io_map.py` ships one map per program (`make_motor_start_io_map`, `make_shuttle_io_map`, selected via `io_map_for_program`). `make_loom_io_map` is the legacy unscoped map — it matches neither program exactly and mislabels `X1` on shuttle traces; it is retained only because existing call sites default to it.
@@ -101,7 +109,7 @@ The pipeline suppresses per-tick stdout by swapping `sys.stdout` for a `StringIO
 | `src/analysis/` | `aggregator`, `coverage_gap`, `log_filter` (timeline compression), `analysis_payload` / `export_analysis` (build the JSON the AI layer consumes) |
 | `src/ai/` | `ollama_client` (stdlib `urllib` → `/api/generate`), `prompt_builder`, `prompt_limiter` (token budget), `failure_explainer` / `coverage_analyzer` / `scenario_suggester` / `safety_analyzer`, `ai_report` (fans out to all four), `prompt_snapshot` (audit trail of prompts sent) |
 | `src/bridge/` | **Standalone, not wired into the CLI.** Compares simulation traces against real-machine traces: `io_map` (program-scoped), `sim_trace` / `real_trace` / `trace_recorder`, `real_adapter` (currently a mock), `trace_aligner` (two-pointer matching + offset diagnostics), `trace_diff` (ticks / transitions modes), `mismatch_report`, `readable_report`, `comparison_export` |
-| `src/shim/` | `twin_runtime` — PLC + `loom_twin` in a **closed loop** at two rates (physics 1ms, PLC scan 10ms). The bench-simulator core: this is what makes Y outputs exist for a collector to poll. |
+| `src/shim/` | The Phase 1 bench simulator. `twin_runtime` (PLC + `loom_twin` **closed loop**, physics 1ms / PLC scan 10ms — what makes Y outputs exist at all), `tag_map` (declarative register map, every tag carries provenance), `modbus_server` (**read-only** Modbus TCP, FC3/FC4 only), `modbus_collector` (reference collector; the shape the platform repo's `real_adapter` mirrors) |
 | `loom_twin.py` | High-fidelity twin: `MotorStateMachine` (startup/stop delays), `CyclicShuttleModel`, `PositionSensor`, `DelayedSensor` (delay + miss-every-n noise) |
 | `calibration.py` | Measure the twin, compare to real-world targets, iteratively adjust profile parameters, drift detection, `ProfileRegistry`, calibrated-model save/load |
 
