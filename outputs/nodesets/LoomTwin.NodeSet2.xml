@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UANodeSet xmlns="http://opcfoundation.org/UA/2011/03/UANodeSet.xsd">
+  <NamespaceUris>
+    <Uri>http://jpgroup.example/UA/LoomTwin/</Uri>
+  </NamespaceUris>
+  <Models>
+    <Model ModelUri="http://jpgroup.example/UA/LoomTwin/" Version="1.1.0" PublicationDate="2026-08-13T00:00:00Z" />
+  </Models>
+  <Aliases>
+    <Alias Alias="Boolean">i=1</Alias>
+    <Alias Alias="Double">i=11</Alias>
+    <Alias Alias="String">i=12</Alias>
+    <Alias Alias="UInt16">i=5</Alias>
+    <Alias Alias="UInt32">i=7</Alias>
+    <Alias Alias="Organizes">i=35</Alias>
+    <Alias Alias="HasTypeDefinition">i=40</Alias>
+    <Alias Alias="HasComponent">i=47</Alias>
+  </Aliases>
+  <UAObject NodeId="ns=1;i=5000" BrowseName="1:loom-01">
+    <DisplayName>loom-01</DisplayName>
+    <Description>Line loom-01 at jpgroup/ankleshwar/weaving. Program: programs/shuttle_control.st</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=58</Reference>
+      <Reference ReferenceType="Organizes" IsForward="false">i=85</Reference>
+    </References>
+  </UAObject>
+  <UAObject NodeId="ns=1;i=5100" BrowseName="1:controller" ParentNodeId="ns=1;i=5000">
+    <DisplayName>controller</DisplayName>
+    <Description>Machine unit 'controller' of loom-01. Corresponds to what OPC 40084 calls a component; not mapped to it — see module docstring.</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=58</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5000</Reference>
+    </References>
+  </UAObject>
+  <UAVariable NodeId="ns=1;i=6000" BrowseName="1:scan_time_ms" ParentNodeId="ns=1;i=5100" DataType="UInt32" AccessLevel="1" UserAccessLevel="1">
+    <DisplayName>scan_time_ms</DisplayName>
+    <Description>TwinRuntime.t_ms — PLC scan timestamp. Record this as the trace timestamp (TS_SCAN) so traces align exactly. Wraps after ~49.7 days. [unit: ms; topic: jpgroup/ankleshwar/weaving/loom-01/controller/scan_time_ms; modbus: register 0]</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5100</Reference>
+    </References>
+  </UAVariable>
+  <UAVariable NodeId="ns=1;i=6001" BrowseName="1:scan_count" ParentNodeId="ns=1;i=5100" DataType="UInt16" AccessLevel="1" UserAccessLevel="1">
+    <DisplayName>scan_count</DisplayName>
+    <Description>PLC scans since start; wraps at 65535. Exists so a collector can detect MISSED POLLS, not to measure time [unit: count; topic: jpgroup/ankleshwar/weaving/loom-01/controller/scan_count; modbus: register 6]</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5100</Reference>
+    </References>
+  </UAVariable>
+  <UAVariable NodeId="ns=1;i=6002" BrowseName="1:protocol_version" ParentNodeId="ns=1;i=5100" DataType="UInt16" AccessLevel="1" UserAccessLevel="1">
+    <DisplayName>protocol_version</DisplayName>
+    <Description>Shim register-map version; bump on any layout change [topic: jpgroup/ankleshwar/weaving/loom-01/controller/protocol_version; modbus: register 7]</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5100</Reference>
+    </References>
+  </UAVariable>
+  <UAVariable NodeId="ns=1;i=6003" BrowseName="1:run_command" ParentNodeId="ns=1;i=5100" DataType="Boolean" AccessLevel="1" UserAccessLevel="1">
+    <DisplayName>run_command</DisplayName>
+    <Description>PLC input X0 — the operator's run command. Stays asserted during a jam; nothing about a jam withdraws it [PLC symbol X0 (programs/shuttle_control.st); topic: jpgroup/ankleshwar/weaving/loom-01/controller/run_command; modbus: register 8 bit 0]</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5100</Reference>
+    </References>
+  </UAVariable>
+  <UAObject NodeId="ns=1;i=5101" BrowseName="1:drive" ParentNodeId="ns=1;i=5000">
+    <DisplayName>drive</DisplayName>
+    <Description>Machine unit 'drive' of loom-01. Corresponds to what OPC 40084 calls a component; not mapped to it — see module docstring.</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=58</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5000</Reference>
+    </References>
+  </UAObject>
+  <UAVariable NodeId="ns=1;i=6004" BrowseName="1:motor_state" ParentNodeId="ns=1;i=5101" DataType="String" AccessLevel="1" UserAccessLevel="1">
+    <DisplayName>motor_state</DisplayName>
+    <Description>MotorStateMachine.state: 0=STOPPED 1=STARTING 2=RUNNING 3=STOPPING [values: 0=STOPPED, 1=STARTING, 2=RUNNING, 3=STOPPING; topic: jpgroup/ankleshwar/weaving/loom-01/drive/motor_state; modbus: register 3]</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5101</Reference>
+    </References>
+  </UAVariable>
+  <UAVariable NodeId="ns=1;i=6005" BrowseName="1:motor_contactor" ParentNodeId="ns=1;i=5101" DataType="Boolean" AccessLevel="1" UserAccessLevel="1">
+    <DisplayName>motor_contactor</DisplayName>
+    <Description>PLC output Y0 — shuttle motor enable. Exists only because the PLC is in the loop [PLC symbol Y0 (programs/shuttle_control.st); topic: jpgroup/ankleshwar/weaving/loom-01/drive/motor_contactor; modbus: register 9 bit 0]</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5101</Reference>
+    </References>
+  </UAVariable>
+  <UAObject NodeId="ns=1;i=5102" BrowseName="1:shuttle" ParentNodeId="ns=1;i=5000">
+    <DisplayName>shuttle</DisplayName>
+    <Description>Machine unit 'shuttle' of loom-01. Corresponds to what OPC 40084 calls a component; not mapped to it — see module docstring.</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=58</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5000</Reference>
+    </References>
+  </UAObject>
+  <UAVariable NodeId="ns=1;i=6006" BrowseName="1:position" ParentNodeId="ns=1;i=5102" DataType="Double" AccessLevel="1" UserAccessLevel="1">
+    <DisplayName>position</DisplayName>
+    <Description>CyclicShuttleModel.position, 0-360 deg. Carried on Modbus as x100 in a uint16 (max 35999 fits) [unit: deg; topic: jpgroup/ankleshwar/weaving/loom-01/shuttle/position; modbus: register 2]</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5102</Reference>
+    </References>
+  </UAVariable>
+  <UAVariable NodeId="ns=1;i=6007" BrowseName="1:cycles_completed" ParentNodeId="ns=1;i=5102" DataType="UInt16" AccessLevel="1" UserAccessLevel="1">
+    <DisplayName>cycles_completed</DisplayName>
+    <Description>CyclicShuttleModel.cycles_completed; wraps at 65535 [unit: count; topic: jpgroup/ankleshwar/weaving/loom-01/shuttle/cycles_completed; modbus: register 4]</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5102</Reference>
+    </References>
+  </UAVariable>
+  <UAVariable NodeId="ns=1;i=6008" BrowseName="1:position_sensor" ParentNodeId="ns=1;i=5102" DataType="Boolean" AccessLevel="1" UserAccessLevel="1">
+    <DisplayName>position_sensor</DisplayName>
+    <Description>PLC input X1 — shuttle position threshold sensor under shuttle_control.st. NOTE: X1 is the FAULT sensor under motor_start.st [PLC symbol X1 (programs/shuttle_control.st); topic: jpgroup/ankleshwar/weaving/loom-01/shuttle/position_sensor; modbus: register 8 bit 1]</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5102</Reference>
+    </References>
+  </UAVariable>
+  <UAVariable NodeId="ns=1;i=6009" BrowseName="1:position_indicator" ParentNodeId="ns=1;i=5102" DataType="Boolean" AccessLevel="1" UserAccessLevel="1">
+    <DisplayName>position_indicator</DisplayName>
+    <Description>PLC output Y1 — position reached indicator lamp [PLC symbol Y1 (programs/shuttle_control.st); topic: jpgroup/ankleshwar/weaving/loom-01/shuttle/position_indicator; modbus: register 9 bit 1]</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5102</Reference>
+    </References>
+  </UAVariable>
+  <UAVariable NodeId="ns=1;i=6010" BrowseName="1:jam_sensor" ParentNodeId="ns=1;i=5102" DataType="Boolean" AccessLevel="1" UserAccessLevel="1">
+    <DisplayName>jam_sensor</DisplayName>
+    <Description>PLC input X2 — shuttle jam detection sensor [PLC symbol X2 (programs/shuttle_control.st); topic: jpgroup/ankleshwar/weaving/loom-01/shuttle/jam_sensor; modbus: register 8 bit 2]</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5102</Reference>
+    </References>
+  </UAVariable>
+  <UAVariable NodeId="ns=1;i=6011" BrowseName="1:jam_detected" ParentNodeId="ns=1;i=5102" DataType="Boolean" AccessLevel="1" UserAccessLevel="1">
+    <DisplayName>jam_detected</DisplayName>
+    <Description>Jam injector state. Mirrors X2, but is the twin's own view rather than the PLC input image — they differ if the PLC ever samples between edges [topic: jpgroup/ankleshwar/weaving/loom-01/shuttle/jam_detected; modbus: register 5]</Description>
+    <References>
+      <Reference ReferenceType="HasTypeDefinition">i=63</Reference>
+      <Reference ReferenceType="HasComponent" IsForward="false">ns=1;i=5102</Reference>
+    </References>
+  </UAVariable>
+</UANodeSet>

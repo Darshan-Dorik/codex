@@ -48,6 +48,32 @@ python3 src/bridge/trace_diff.py
 
 `src/core/plc.py`, `src/core/loom.py`, and `tool/*.py` set up `sys.path` themselves and run bare. `tool/orchestrator.py` is the canonical example of the path-injection preamble to copy when adding a new entry point.
 
+### The same-tick trap
+
+**A scan cycle produces same-tick effects. A test that locates an effect by scanning forward from its trigger will skip the effect and measure the next one — and still pass.**
+
+This has now been written twice, in unrelated modules, by someone who knew about it the second time:
+
+```python
+# trace_diff Test 7 — asserted a "one scan late" edge while the
+# golden's scan period had changed from 100ms to 10ms, so it was
+# really testing a ten-scan defer with ten scans of tolerance.
+
+# twin_runtime Test 6 — located the motor stop with
+#     next(e for e in trace if e["time"] > jam_rise["time"] and not e["outputs"]["Y0"])
+# The `> jam_rise["time"]` skipped the tick where Y0 actually fell,
+# so the test asserted one scan of PLC latency that does not exist.
+```
+
+Both passed. Both described a mechanism the code does not have. The cause is structural, not careless: `PLC.scan()` snapshots inputs, evaluates, and commits outputs **within one scan**, so cause and effect share a timestamp by design. Anything reaching for "the effect after the trigger" is reaching past it.
+
+When writing a test that relates a trigger to an effect:
+
+- Start the search **at** the trigger tick (`>=`), not after it (`>`).
+- Assert the value **in the trigger's own tick** first, then separately assert what the following tick holds. Two assertions, not one search.
+- If a delay is genuinely expected, derive it from a named constant (`scan_period_ms`) and state the derivation, so a rate change breaks the test loudly instead of silently re-pointing it.
+- Print the window around the event in the test output. Both bugs were obvious the moment three consecutive ticks were shown side by side.
+
 ### Two rates: physics vs scan
 
 `sim_step_ms` integrates the twin's physics; `scan_period_ms` is how often the PLC samples it. They are **not** the same knob, and `TwinRuntime` enforces a 10:1 minimum ratio — if they are equal the PLC sees every physics update and **no sub-scan event can exist**, which is the whole point of the split. A sensor pulse narrower than one scan can then rise and fall unseen, exactly as on a real controller (`twin_runtime.py` Test 4 demonstrates a 5ms pulse missed 10 times out of 10 at a 10ms scan).
@@ -65,6 +91,29 @@ Defaults are `sim_step_ms=1` / `scan_period_ms=10`. Real loom PLCs scan at 5–2
 FC3 is served as an alias of FC4 because real drives expose process data as holding registers (the Delta MS300 profile reads `0x2103` that way), so a collector written against real hardware works against the bench target unchanged.
 
 Registers 0–1 carry the twin's **own scan time**. A collector that records that as its trace timestamp gets traces that align against sim traces at `tolerance_ms=0`; one that stamps on arrival needs a tolerance window forever. See `modbus_collector.py`.
+
+### One signal definition, two faces
+
+`tag_map.make_twin_signals()` is the single canonical definition of every signal — hierarchy (`line → unit → measure`), datatype, engineering unit, PLC symbol, provenance. Both transports are *projections* of it:
+
+- `modbus_tag_map(signals)` → the register map. Addresses come from each signal's declared placement, never auto-assigned: the layout is a published contract (`protocol_version`), and auto-assignment would silently re-point every deployed collector when a signal is reordered.
+- `nodeset_export.build_nodeset(signals)` → the OPC UA NodeSet2.
+
+Adding a signal in one place adds it to both. `nodeset_export.py` asserts the two faces cover exactly the same signal set, so drift fails a test rather than shipping.
+
+The hierarchy deliberately mirrors the brief's topic namespace (`jpgroup/ankleshwar/weaving/loom-01/shuttle/position`).
+
+**Not mapped to EUROMAP 84 / OPC 40084.** That series has no circular loom part, so mapping now would mean extending a standard before ever conforming to one. The model uses its own namespace; `unit` corresponds to what 40084 calls a component and `measure` to its variables, so the later mapping is mechanical. Intended alignment is in comments only — nothing claims conformance.
+
+**Validating the NodeSet** (validation is the deliverable, not the XML):
+
+```bash
+python3 src/shim/nodeset_export.py        # regenerates + XSD-validates via xmllint
+python3 -m venv /tmp/uavenv && /tmp/uavenv/bin/pip install asyncua
+/tmp/uavenv/bin/python src/shim/nodeset_client_check.py   # real client load + browse
+```
+
+The XSD is vendored at `src/shim/UANodeSet.xsd` (OPC Foundation 1.05) so validation works offline. `asyncua` is **not** a repo dependency — the engine stays stdlib-only and the check skips cleanly without it.
 
 ### Symbols are program-scoped
 
@@ -109,7 +158,7 @@ The pipeline suppresses per-tick stdout by swapping `sys.stdout` for a `StringIO
 | `src/analysis/` | `aggregator`, `coverage_gap`, `log_filter` (timeline compression), `analysis_payload` / `export_analysis` (build the JSON the AI layer consumes) |
 | `src/ai/` | `ollama_client` (stdlib `urllib` → `/api/generate`), `prompt_builder`, `prompt_limiter` (token budget), `failure_explainer` / `coverage_analyzer` / `scenario_suggester` / `safety_analyzer`, `ai_report` (fans out to all four), `prompt_snapshot` (audit trail of prompts sent) |
 | `src/bridge/` | **Standalone, not wired into the CLI.** Compares simulation traces against real-machine traces: `io_map` (program-scoped), `sim_trace` / `real_trace` / `trace_recorder`, `real_adapter` (currently a mock), `trace_aligner` (two-pointer matching + offset diagnostics), `trace_diff` (ticks / transitions modes), `mismatch_report`, `readable_report`, `comparison_export` |
-| `src/shim/` | The Phase 1 bench simulator. `twin_runtime` (PLC + `loom_twin` **closed loop**, physics 1ms / PLC scan 10ms — what makes Y outputs exist at all), `tag_map` (declarative register map, every tag carries provenance), `modbus_server` (**read-only** Modbus TCP, FC3/FC4 only), `modbus_collector` (reference collector; the shape the platform repo's `real_adapter` mirrors) |
+| `src/shim/` | The Phase 1 bench simulator. `twin_runtime` (PLC + `loom_twin` **closed loop**, physics 1ms / PLC scan 10ms — what makes Y outputs exist at all), `tag_map` (declarative register map, every tag carries provenance), `modbus_server` (**read-only** Modbus TCP, FC3/FC4 only), `modbus_collector` (reference collector; the shape the platform repo's `real_adapter` mirrors), `nodeset_export` (OPC UA NodeSet2 from the **same** signal definitions), `nodeset_client_check` (loads the NodeSet in a real client; needs `asyncua`, skips without it) |
 | `loom_twin.py` | High-fidelity twin: `MotorStateMachine` (startup/stop delays), `CyclicShuttleModel`, `PositionSensor`, `DelayedSensor` (delay + miss-every-n noise) |
 | `calibration.py` | Measure the twin, compare to real-world targets, iteratively adjust profile parameters, drift detection, `ProfileRegistry`, calibrated-model save/load |
 

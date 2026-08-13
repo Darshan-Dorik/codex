@@ -486,7 +486,7 @@ if __name__ == "__main__":
 
     decoded_live = tm.decode(vals_fc4)
     print(f"  decoded: t={decoded_live['scan_time_ms']}ms "
-          f"pos={decoded_live['shuttle_position']} "
+          f"pos={decoded_live['position']} "
           f"state={decoded_live['motor_state']} "
           f"in={decoded_live['plc_inputs']} out={decoded_live['plc_outputs']}")
 

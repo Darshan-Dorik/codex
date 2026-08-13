@@ -199,9 +199,262 @@ class TagMap:
         return out
 
 
+# ---------------------------------------------------------------------------
+# Signals — the canonical, transport-neutral definitions
+# ---------------------------------------------------------------------------
+#
+# ONE SOURCE, TWO FACES. A signal is defined once here; the Modbus
+# register map and the OPC UA NodeSet are both projections of it.
+# Defining a signal twice is how a bench rig ends up telling two
+# collectors two different stories about the same machine.
+#
+# The hierarchy is line -> unit -> measure, deliberately matching the
+# topic namespace from the platform brief:
+#
+#     <enterprise>/<site>/<area>/<line>/<unit>/<measure>
+#     jpgroup/ankleshwar/weaving/loom-01/shuttle/position
+#
+# EUROMAP 84 / OPC 40084 ALIGNMENT — NOT DONE, AND DELIBERATELY SO.
+# The 40084 series has no circular loom part, so mapping onto it now
+# would mean extending a standard before ever conforming to one. This
+# uses its own namespace. The hierarchy is shaped so the later mapping
+# is mechanical rather than a re-model: units correspond to what 40084
+# calls components, measures to their variables.
+
+
+class ModbusPlacement:
+    """Where a signal lands in the register map."""
+
+    def __init__(self, address, words=1, bit=None, word_name=None,
+                 encoding="uint16"):
+        self.address   = address
+        self.words     = words
+        self.bit       = bit
+        self.word_name = word_name    # for signals packed into one word
+        self.encoding  = encoding
+
+
+class Signal:
+    """
+    One atomic measured value.
+
+    Carries what BOTH transports need — identity, hierarchy, datatype,
+    engineering unit, provenance — plus a Modbus placement. The OPC UA
+    projection ignores the placement; the Modbus projection ignores the
+    hierarchy. Neither redefines the signal.
+    """
+
+    def __init__(self, measure, unit_name, datatype, source,
+                 symbol=None, eng_unit="", scale=1.0, note="",
+                 enum_values=None, modbus=None):
+        self.measure     = measure      # canonical name, OPC UA BrowseName
+        self.unit_name   = unit_name    # machine unit: drive/shuttle/controller
+        self.datatype    = datatype     # OPC UA built-in type name
+        self.source      = source       # callable(snapshot) -> value
+        self.symbol      = symbol       # PLC symbol (X0/Y0), if any
+        self.eng_unit    = eng_unit
+        self.scale       = scale
+        self.note        = note
+        self.enum_values = enum_values
+        self.modbus      = modbus
+
+    def value(self, snapshot):
+        """Engineering value — what OPC UA exposes."""
+        return self.source(snapshot)
+
+
+class SignalSet:
+    """A line's signals, plus where the line sits in the namespace."""
+
+    def __init__(self, signals, program=None, enterprise="jpgroup",
+                 site="ankleshwar", area="weaving", line="loom-01",
+                 namespace_uri="http://jpgroup.example/UA/LoomTwin/"):
+        self.signals       = list(signals)
+        self.program       = program
+        self.enterprise    = enterprise
+        self.site          = site
+        self.area          = area
+        self.line          = line
+        self.namespace_uri = namespace_uri
+
+        for sig in self.signals:
+            if not sig.note:
+                raise ValueError(
+                    f"signal {sig.measure!r} has no provenance note")
+
+    def topic(self, signal):
+        """The signal's topic path, per the brief's namespace."""
+        return "/".join((self.enterprise, self.site, self.area, self.line,
+                         signal.unit_name, signal.measure))
+
+    def units(self):
+        """Machine units, in first-appearance order."""
+        seen = []
+        for sig in self.signals:
+            if sig.unit_name not in seen:
+                seen.append(sig.unit_name)
+        return seen
+
+    def by_unit(self, unit_name):
+        return [s for s in self.signals if s.unit_name == unit_name]
+
+    def by_measure(self, measure):
+        for s in self.signals:
+            if s.measure == measure:
+                return s
+        raise KeyError(measure)
+
+
+def make_twin_signals(program="programs/shuttle_control.st"):
+    """
+    The twin's signals — the single definition both faces project from.
+
+    Symbols are PROGRAM-SCOPED: X1 is the position sensor under
+    shuttle_control.st and the fault sensor under motor_start.st, so
+    the set records which program it describes.
+    """
+    return SignalSet([
+        Signal("scan_time_ms", "controller", "UInt32",
+               lambda s: s["time"], eng_unit="ms",
+               modbus=ModbusPlacement(0, words=2, encoding="uint32"),
+               note="TwinRuntime.t_ms — PLC scan timestamp. Record this "
+                    "as the trace timestamp (TS_SCAN) so traces align "
+                    "exactly. Wraps after ~49.7 days."),
+
+        Signal("scan_count", "controller", "UInt16",
+               lambda s: s["scan_count"] & 0xFFFF, eng_unit="count",
+               modbus=ModbusPlacement(6),
+               note="PLC scans since start; wraps at 65535. Exists so a "
+                    "collector can detect MISSED POLLS, not to measure "
+                    "time"),
+
+        Signal("protocol_version", "controller", "UInt16",
+               lambda s: PROTOCOL_VERSION,
+               modbus=ModbusPlacement(7),
+               note="Shim register-map version; bump on any layout change"),
+
+        Signal("run_command", "controller", "Boolean",
+               lambda s: bool(s["sensors"].get("X0")), symbol="X0",
+               modbus=ModbusPlacement(8, bit=0, word_name="plc_inputs"),
+               note="PLC input X0 — the operator's run command. Stays "
+                    "asserted during a jam; nothing about a jam "
+                    "withdraws it"),
+
+        Signal("motor_state", "drive", "String",
+               lambda s: s["motor_state"], enum_values=MOTOR_STATES,
+               modbus=ModbusPlacement(3, encoding="enum"),
+               note="MotorStateMachine.state: "
+                    "0=STOPPED 1=STARTING 2=RUNNING 3=STOPPING"),
+
+        Signal("motor_contactor", "drive", "Boolean",
+               lambda s: bool(s["outputs"].get("Y0")), symbol="Y0",
+               modbus=ModbusPlacement(9, bit=0, word_name="plc_outputs"),
+               note="PLC output Y0 — shuttle motor enable. Exists only "
+                    "because the PLC is in the loop"),
+
+        Signal("position", "shuttle", "Double",
+               lambda s: s["shuttle_position"], eng_unit="deg", scale=0.01,
+               modbus=ModbusPlacement(2),
+               note="CyclicShuttleModel.position, 0-360 deg. Carried on "
+                    "Modbus as x100 in a uint16 (max 35999 fits)"),
+
+        Signal("cycles_completed", "shuttle", "UInt16",
+               lambda s: s["cycles_completed"], eng_unit="count",
+               modbus=ModbusPlacement(4),
+               note="CyclicShuttleModel.cycles_completed; wraps at 65535"),
+
+        Signal("position_sensor", "shuttle", "Boolean",
+               lambda s: bool(s["sensors"].get("X1")), symbol="X1",
+               modbus=ModbusPlacement(8, bit=1, word_name="plc_inputs"),
+               note="PLC input X1 — shuttle position threshold sensor "
+                    "under shuttle_control.st. NOTE: X1 is the FAULT "
+                    "sensor under motor_start.st"),
+
+        Signal("position_indicator", "shuttle", "Boolean",
+               lambda s: bool(s["outputs"].get("Y1")), symbol="Y1",
+               modbus=ModbusPlacement(9, bit=1, word_name="plc_outputs"),
+               note="PLC output Y1 — position reached indicator lamp"),
+
+        Signal("jam_sensor", "shuttle", "Boolean",
+               lambda s: bool(s["sensors"].get("X2")), symbol="X2",
+               modbus=ModbusPlacement(8, bit=2, word_name="plc_inputs"),
+               note="PLC input X2 — shuttle jam detection sensor"),
+
+        Signal("jam_detected", "shuttle", "Boolean",
+               lambda s: bool(s["jam_detected"]),
+               modbus=ModbusPlacement(5),
+               note="Jam injector state. Mirrors X2, but is the twin's "
+                    "own view rather than the PLC input image — they "
+                    "differ if the PLC ever samples between edges"),
+    ], program=program)
+
+
+def modbus_tag_map(signal_set):
+    """
+    Project a SignalSet onto the Modbus register map.
+
+    The layout is a PUBLISHED CONTRACT (see protocol_version), so
+    addresses come from each signal's declared placement rather than
+    being auto-assigned — auto-assignment would silently re-point every
+    deployed collector the moment a signal was reordered.
+
+    Bit-packed signals are grouped into their shared word and keyed by
+    PLC SYMBOL, because that is what the trace format and the bridge
+    compare on. The OPC UA face keys the same signals by measure name.
+    """
+    scalars = []
+    packed  = {}
+
+    for sig in signal_set.signals:
+        if sig.modbus is None:
+            continue
+        if sig.modbus.bit is None:
+            scalars.append(sig)
+        else:
+            packed.setdefault(
+                (sig.modbus.address, sig.modbus.word_name), []).append(sig)
+
+    tags = []
+
+    for sig in scalars:
+        placement = sig.modbus
+        if placement.encoding == "uint32":
+            kind = "uint32"
+            source = sig.source
+        elif placement.encoding == "enum":
+            kind = "enum"
+            source = sig.source
+        elif sig.datatype == "Boolean":
+            kind = "uint16"
+            source = (lambda s, _s=sig: 1 if _s.source(s) else 0)
+        else:
+            kind = "uint16"
+            source = sig.source
+        tags.append(Tag(placement.address, sig.measure, kind, source,
+                        unit=sig.eng_unit, scale=sig.scale,
+                        note=sig.note))
+
+    for (address, word_name), sigs in sorted(packed.items()):
+        bits = {s.modbus.bit: s.symbol for s in sigs}
+        members = ", ".join(f"bit{s.modbus.bit}={s.symbol}:{s.measure}"
+                            for s in sorted(sigs, key=lambda x: x.modbus.bit))
+        tags.append(Tag(
+            address, word_name, "bitfield",
+            (lambda s, _sigs=sigs: {
+                _x.symbol: bool(_x.source(s)) for _x in _sigs}),
+            bits=bits,
+            note=(f"Packed PLC image, PROGRAM-SCOPED to "
+                  f"{signal_set.program}: {members}")))
+
+    return TagMap(tags, program=signal_set.program)
+
+
 def make_twin_tag_map(program="programs/shuttle_control.st"):
     """
     The standard register map for a TwinRuntime.
+
+    Now a projection of make_twin_signals() rather than a second
+    hand-written definition of the same signals.
 
     Addresses 0-1 are the load-bearing ones for trace comparison: they
     carry the twin's own SCAN TIME. A collector that records this as
@@ -210,55 +463,7 @@ def make_twin_tag_map(program="programs/shuttle_control.st"):
     collector that stamps on arrival instead needs a tolerance window
     for no reason — see trace_aligner.TS_SCAN vs TS_ARRIVAL.
     """
-    tags = [
-        Tag(0, "scan_time_ms", "uint32",
-            lambda s: s["time"], unit="ms",
-            note="TwinRuntime.t_ms — PLC scan timestamp. Record this as "
-                 "the trace timestamp (TS_SCAN) so traces align exactly. "
-                 "Wraps after ~49.7 days."),
-
-        Tag(2, "shuttle_position", "uint16",
-            lambda s: s["shuttle_position"], unit="deg", scale=0.01,
-            note="CyclicShuttleModel.position, 0-360 deg, x100. "
-                 "Max 35999 fits uint16."),
-
-        Tag(3, "motor_state", "enum",
-            lambda s: s["motor_state"],
-            note="MotorStateMachine.state: "
-                 "0=STOPPED 1=STARTING 2=RUNNING 3=STOPPING"),
-
-        Tag(4, "cycles_completed", "uint16",
-            lambda s: s["cycles_completed"], unit="count",
-            note="CyclicShuttleModel.cycles_completed; wraps at 65535"),
-
-        Tag(5, "jam_detected", "uint16",
-            lambda s: 1 if s["jam_detected"] else 0,
-            note="Jam injector state; mirrors PLC input X2"),
-
-        Tag(6, "scan_count", "uint16",
-            lambda s: s["scan_count"] & 0xFFFF, unit="count",
-            note="PLC scans since start; wraps at 65535. Exists so a "
-                 "collector can detect MISSED POLLS, not to measure time"),
-
-        Tag(7, "protocol_version", "uint16",
-            lambda s: PROTOCOL_VERSION,
-            note="Shim register-map version; bump on any layout change"),
-
-        Tag(8, "plc_inputs", "bitfield",
-            lambda s: s["sensors"],
-            bits={0: "X0", 1: "X1", 2: "X2"},
-            note="PLC input image. Bit meanings are PROGRAM-SCOPED: "
-                 "under shuttle_control.st X0=run command, "
-                 "X1=position sensor, X2=jam sensor"),
-
-        Tag(9, "plc_outputs", "bitfield",
-            lambda s: s["outputs"],
-            bits={0: "Y0", 1: "Y1"},
-            note="PLC output image. Under shuttle_control.st "
-                 "Y0=shuttle motor, Y1=position indicator. These exist "
-                 "only because the PLC is in the loop"),
-    ]
-    return TagMap(tags, program=program)
+    return modbus_tag_map(make_twin_signals(program=program))
 
 
 if __name__ == "__main__":
@@ -336,9 +541,9 @@ if __name__ == "__main__":
     print(f"  PASS — scan_time_ms round-trips exactly "
           f"({decoded['scan_time_ms']}ms)")
 
-    assert abs(decoded["shuttle_position"] - snap["shuttle_position"]) < 0.01
-    print(f"  PASS — shuttle_position round-trips within scale "
-          f"({decoded['shuttle_position']} deg)")
+    assert abs(decoded["position"] - snap["shuttle_position"]) < 0.01
+    print(f"  PASS — position round-trips within scale "
+          f"({decoded['position']} deg)")
 
     assert decoded["motor_state"] == snap["motor_state"]
     assert decoded["plc_inputs"] == {k: bool(v)
