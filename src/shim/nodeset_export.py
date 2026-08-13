@@ -151,6 +151,17 @@ def build_nodeset(signal_set):
     # --- Aliases ---
     aliases = _sub(root, "Aliases")
     used_types = sorted({s.datatype for s in signal_set.signals})
+    unknown = [t for t in used_types if t not in DATATYPE_IDS]
+    if unknown:
+        # A bare KeyError here reads as a bug in the exporter rather
+        # than what it is: a signal declared with a datatype the model
+        # has no OPC UA built-in for.
+        offenders = {s.measure: s.datatype for s in signal_set.signals
+                     if s.datatype in unknown}
+        raise ValueError(
+            f"signals declare datatypes with no OPC UA alias: "
+            f"{offenders}. Known types: {sorted(DATATYPE_IDS)}. Add the "
+            f"built-in to DATATYPE_IDS, or use one of those.")
     for name in used_types:
         _sub(aliases, "Alias", text=DATATYPE_IDS[name], Alias=name)
     for name, nid in (("Organizes", ORGANIZES),

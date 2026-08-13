@@ -24,7 +24,14 @@ python3 tool/loom_validate.py --preset motor_start_basic       # full pipeline
 python3 tool/loom_validate.py my_config.json
 python3 tool/loom_validate.py --template > my_config.json      # starter config
 
-# End-to-end acceptance test (presets, dry run, full runs, error paths, run log)
+# Bench simulator — serve the twin, export/validate its OPC UA model
+python3 tool/loom_shim.py serve            # Modbus :5502 + HTTP :5174, ONE runtime
+python3 tool/loom_shim.py map              # register map + protocol_version
+python3 tool/loom_shim.py export           # write the NodeSet2 (no twin needed)
+python3 tool/loom_shim.py validate         # XSD + structure + face parity (CI-safe)
+
+# End-to-end acceptance test (presets, dry run, full runs, error paths, run log,
+# and Modbus/OPC UA face parity)
 python3 tool/final_validation.py
 
 # UI: backend on :5174, Vite dev server separately
@@ -99,7 +106,9 @@ Registers 0–1 carry the twin's **own scan time**. A collector that records tha
 - `modbus_tag_map(signals)` → the register map. Addresses come from each signal's declared placement, never auto-assigned: the layout is a published contract (`protocol_version`), and auto-assignment would silently re-point every deployed collector when a signal is reordered.
 - `nodeset_export.build_nodeset(signals)` → the OPC UA NodeSet2.
 
-Adding a signal in one place adds it to both. `nodeset_export.py` asserts the two faces cover exactly the same signal set, so drift fails a test rather than shipping.
+Adding a signal in one place adds it to both. `tool/loom_shim.check_faces_cover_same_signals()` asserts the two faces cover exactly the same signal set, and it runs in **`tool/final_validation.py`** — the thing someone runs before committing — not only in the shim's own tests. It is build-time: no twin, no socket, no thread, so it runs in CI, which is where drift actually gets caught.
+
+`loom-shim serve` constructs exactly **one** `TwinRuntime` and hands the same object to every face, so Modbus and HTTP `/state` always describe the same scan. Two runtimes would drift within seconds and a collector cross-checking the two faces would report an inconsistency that exists on no real machine. OPC UA is **not** served live from this repo — `export` writes a build-time model carrying no values; when the platform repo serves it, the same one-source rule applies there.
 
 The hierarchy deliberately mirrors the brief's topic namespace (`jpgroup/ankleshwar/weaving/loom-01/shuttle/position`).
 

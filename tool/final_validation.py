@@ -157,6 +157,28 @@ if __name__ == "__main__":
     assert os.path.exists(os.path.join(run_dir, "run_config.json")), "run_config.json"
     print(f"  PASS — output files exist in {run_dir}")
 
+    # -------------------------------------------------------
+    # Shim: the two faces must project the SAME signals.
+    #
+    # This lives here, not only in nodeset_export's own tests, because
+    # final_validation is what someone runs before committing — and
+    # drift between the Modbus register map and the OPC UA model is
+    # exactly the kind of thing that gets committed when the only check
+    # is inside the module that caused it. Build-time: no twin, no
+    # socket, no thread, so it runs in CI.
+    # -------------------------------------------------------
+    print("\n  Shim: Modbus / OPC UA face parity")
+    from tool.loom_shim import check_faces_cover_same_signals
+
+    parity = check_faces_cover_same_signals()
+    for err in parity["errors"]:
+        print(f"    FAIL — {err}")
+    assert parity["ok"], f"shim faces disagree: {parity['errors']}"
+    print(f"  PASS — {parity['signals']} signals project to "
+          f"{parity['registers']} Modbus registers and "
+          f"{parity['signals']} OPC UA variables "
+          f"({', '.join(parity['units'])})")
+
     print()
     if all_passed:
         print("  ✓  ALL PHASE 10 TESTS PASSED — system is production-ready")
