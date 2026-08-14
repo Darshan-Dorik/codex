@@ -469,8 +469,19 @@ if __name__ == "__main__":
     # Test 4: live server over a real socket
     # -------------------------------------------------------
     print("\nTest 4 — Live server on a real socket:")
+    # The runtime is STEPPED, not free-running, so the register image
+    # is frozen between the paired FC3/FC4 reads below.
+    #
+    # It used to be started on a thread, which made this test flaky at
+    # about 1 run in 4: the two reads are separate round trips, the
+    # machine advanced a scan between them, and scan_time_ms/scan_count/
+    # position legitimately differed — so "FC3 and FC4 must agree" was
+    # comparing two observations of a MOVING system and calling the
+    # difference a protocol bug. Same family as the same-tick trap in
+    # CLAUDE.md: a moving target needs a frozen observation or an
+    # explicitly time-tolerant comparison, not a plain equality.
     rt_live = make_runtime()
-    rt_live.start_thread()
+    rt_live.run_until(2000)
     server = ModbusTwinServer(rt_live, host="127.0.0.1", port=0)
     host, port = server.server_address
     server.start_thread()
@@ -482,7 +493,7 @@ if __name__ == "__main__":
     vals_fc3, exc3 = read_registers(host, port, 0, 10,
                                     FC_READ_HOLDING_REGISTERS)
     print(f"  FC4 read 0..9 → {vals_fc4}")
-    print(f"  FC3 read 0..9 → {vals_fc3}")
+    print(f"  FC3 read 0..9 → {vals_fc3}  (machine frozen for the pair)")
 
     decoded_live = tm.decode(vals_fc4)
     print(f"  decoded: t={decoded_live['scan_time_ms']}ms "
@@ -495,11 +506,18 @@ if __name__ == "__main__":
     print(f"  FC 0x06 (Write Single Register) over the wire → "
           f"exception {exc_write}")
 
-    # Time advances between polls — the shim is live, not a fixture.
+    # Time advances between polls — the shim serves live state, not a
+    # fixture. Driven by stepping the runtime rather than sleeping, so
+    # the advance is exact instead of "however many scans fitted in
+    # 250ms of wall clock".
+    ADVANCE_SCANS = 25
     t1 = tm.decode(read_registers(host, port, 0, 2)[0])["scan_time_ms"]
-    _time.sleep(0.25)
+    for _ in range(ADVANCE_SCANS):
+        rt_live.step_scan()
     t2 = tm.decode(read_registers(host, port, 0, 2)[0])["scan_time_ms"]
-    print(f"  scan_time_ms advanced {t1}ms → {t2}ms across a 250ms gap")
+    expected_advance = ADVANCE_SCANS * rt_live.scan_period_ms
+    print(f"  scan_time_ms advanced {t1}ms → {t2}ms "
+          f"({ADVANCE_SCANS} scans = {expected_advance}ms)")
 
     # -------------------------------------------------------
     # Test 5: connection budget
@@ -585,8 +603,11 @@ if __name__ == "__main__":
         "a write over the wire must be refused, not only in the codec"
     print("  PASS — Test 4: FC 0x06 refused over a real socket")
 
-    assert t2 > t1, "the shim must be live, not a fixture"
-    print(f"  PASS — Test 4: sim time advanced {t2 - t1}ms across the gap")
+    assert t2 - t1 == expected_advance, \
+        (f"the shim must serve live state: expected +{expected_advance}ms "
+         f"after {ADVANCE_SCANS} scans, got +{t2 - t1}ms")
+    print(f"  PASS — Test 4: sim time advanced exactly +{t2 - t1}ms "
+          f"({ADVANCE_SCANS} scans)")
 
     assert server.rejected_connections >= 1, \
         "the connection budget must actually refuse"

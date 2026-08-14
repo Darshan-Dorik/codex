@@ -29,6 +29,14 @@ Two things, and both are decisions rather than details:
      ambiguous, so the collector records which program the shim is
      running and the trace carries it as provenance.
 
+  3. THE REGISTER MAP IS VERIFIED BEFORE ANYTHING IS DECODED. The
+     device publishes its map version in a register; the collector
+     reads it on connect and REFUSES a mismatch. A stale map does not
+     fail — it decodes into plausible wrong values, which is the same
+     failure class as a wrong scale factor and just as invisible. The
+     version is recorded in the trace's provenance too, so a trace
+     says which map produced it.
+
 SAFETY
 ------
 Read-only by construction: the only Modbus function codes this module
@@ -47,8 +55,12 @@ for _p in (_ROOT, os.path.join(_ROOT, "src/bridge")):
         sys.path.insert(0, _p)
 
 from modbus_server import read_registers, FC_READ_INPUT_REGISTERS
-from tag_map import make_twin_tag_map
+from tag_map import make_twin_tag_map, PROTOCOL_VERSION
 from trace_aligner import wrap_trace, TS_SCAN
+
+
+class ProtocolVersionMismatch(IOError):
+    """The device's register map is not the one this collector decodes."""
 
 
 class ModbusCollector:
@@ -59,10 +71,36 @@ class ModbusCollector:
     reconnecting per poll — a device's connection budget is finite,
     and churning connections is how a collector knocks an HMI off its
     own PLC.
+
+    CONTRACT CHECK ON CONNECT
+    -------------------------
+    The register layout is a published contract, and the device carries
+    its version in a register. This collector reads that BEFORE it
+    decodes anything, and REFUSES a mismatch rather than warning about
+    it.
+
+    That severity is the point. A stale register map does not fail
+    loudly — it decodes successfully into plausible, wrong values:
+    position off by a factor, a bit read from the wrong offset, a
+    counter interpreted as a timestamp. That is the same failure class
+    as a wrong scale factor, which silently corrupts every downstream
+    KPI for the life of the system. A collector that continues past a
+    version mismatch is choosing to produce data nobody can trust and
+    nobody can spot.
     """
 
     def __init__(self, host, port, tag_map=None, unit_id=1,
-                 program=None, timeout=5.0):
+                 program=None, timeout=5.0,
+                 expected_protocol_version=PROTOCOL_VERSION,
+                 verify_on_connect=True):
+        """
+        Args:
+            expected_protocol_version : int — the register-map version
+                this collector was written against
+            verify_on_connect : bool — check it before the first decode.
+                Disable only to inspect a device you already know is
+                mismatched; never in acquisition.
+        """
         self.host    = host
         self.port    = port
         self.unit_id = unit_id
@@ -70,19 +108,82 @@ class ModbusCollector:
         self.tag_map = tag_map or make_twin_tag_map(program=program)
         self.program = program or self.tag_map.program
 
+        self.expected_protocol_version = expected_protocol_version
+        self.verify_on_connect         = verify_on_connect
+        self.device_protocol_version   = None
+
         self._txn      = 0
+        self._verified = False
         self.poll_count = 0
         self.missed_scans = 0
         self._last_scan_count = None
+
+    def _version_address(self):
+        """Where protocol_version lives, per the tag map — not hardcoded."""
+        for tag in self.tag_map.tags:
+            if tag.name == "protocol_version":
+                return tag.address
+        raise ProtocolVersionMismatch(
+            "this tag map declares no protocol_version tag, so the "
+            "device's register-map version cannot be checked")
+
+    def verify_contract(self):
+        """
+        Read the device's protocol_version and refuse a mismatch.
+
+        Called automatically before the first decode. Safe to call
+        again; it re-reads and re-checks.
+
+        Returns:
+            int — the device's protocol version
+
+        Raises:
+            ProtocolVersionMismatch — if it differs from the version
+            this collector decodes.
+        """
+        address = self._version_address()
+        self._txn = (self._txn + 1) & 0xFFFF
+        values, exception = read_registers(
+            self.host, self.port, address, 1,
+            function_code=FC_READ_INPUT_REGISTERS,
+            unit_id=self.unit_id, transaction_id=self._txn,
+            timeout=self.timeout)
+
+        if exception is not None:
+            raise ProtocolVersionMismatch(
+                f"Modbus exception {exception} reading protocol_version "
+                f"at register {address} from {self.host}:{self.port}")
+
+        device_version = values[0]
+        self.device_protocol_version = device_version
+
+        if device_version != self.expected_protocol_version:
+            raise ProtocolVersionMismatch(
+                f"register-map version mismatch: {self.host}:{self.port} "
+                f"reports protocol_version {device_version}, this "
+                f"collector decodes version "
+                f"{self.expected_protocol_version}. Refusing to poll — "
+                f"decoding a stale map does not fail, it produces "
+                f"plausible wrong values. Regenerate the collector's tag "
+                f"map from the device's map "
+                f"(`loom-shim map`, or GET /map) before acquiring.")
+
+        self._verified = True
+        return device_version
 
     def poll(self):
         """
         Read the full register image once and decode it.
 
+        Verifies the register-map version on the first call.
+
         Returns:
             dict — decoded engineering values, plus "signals", the flat
             {symbol: bool} view the trace format wants.
         """
+        if self.verify_on_connect and not self._verified:
+            self.verify_contract()
+
         self._txn = (self._txn + 1) & 0xFFFF
         values, exception = read_registers(
             self.host, self.port, 0, self.tag_map.size,
@@ -153,7 +254,8 @@ class ModbusCollector:
         return wrap_trace(entries, TS_SCAN,
                           program=self.program,
                           device=f"modbus://{self.host}:{self.port}",
-                          collector="ModbusCollector")
+                          collector="ModbusCollector",
+                          protocol_version=self.device_protocol_version)
 
 
 if __name__ == "__main__":
@@ -309,3 +411,57 @@ if __name__ == "__main__":
         "skipping 5 scans must register as missed polls"
     print(f"  PASS — {collector.missed_scans} missed scans detected "
           f"(a collector must tell 'nothing changed' from 'not looking')")
+
+    # -------------------------------------------------------
+    # Test 6: the register-map contract is checked on connect
+    # -------------------------------------------------------
+    print("\nTest 6 — protocol_version checked on connect:")
+
+    rt6 = make_runtime()
+    server6 = ModbusTwinServer(rt6, host="127.0.0.1", port=0)
+    h6, p6 = server6.server_address
+    server6.start_thread()
+    _time.sleep(0.2)
+
+    ok_collector = ModbusCollector(h6, p6, program=rt6.program)
+    ok_collector.poll()
+    print(f"  matching version   → verified, "
+          f"device reports {ok_collector.device_protocol_version}")
+
+    stale = ModbusCollector(h6, p6, program=rt6.program,
+                            expected_protocol_version=999)
+    refused = None
+    decoded_anyway = None
+    try:
+        decoded_anyway = stale.poll()
+    except ProtocolVersionMismatch as exc:
+        refused = str(exc)
+    print(f"  stale collector    → refused")
+    print(f"    {refused[:88]}...")
+    print(f"  polls completed    → {stale.poll_count} "
+          f"(refused BEFORE decoding, not after)")
+
+    # A trace records the version it was collected under.
+    traced = ok_collector.record(3, step_fn=rt6.step_scan)
+    print(f"  trace provenance   → "
+          f"protocol_version={traced['provenance']['protocol_version']}")
+
+    server6.shutdown()
+    server6.server_close()
+
+    assert ok_collector.device_protocol_version == PROTOCOL_VERSION
+    assert ok_collector._verified is True
+    print(f"  PASS — matching version verified on connect")
+
+    assert refused is not None, "a version mismatch must be refused"
+    assert "Refusing to poll" in refused
+    assert decoded_anyway is None, \
+        "no data may be returned from a mismatched device"
+    assert stale.poll_count == 0, \
+        "the refusal must happen before any decode, not after"
+    print("  PASS — mismatched register map refused before decoding; "
+          "no plausible-wrong values produced")
+
+    assert traced["provenance"]["protocol_version"] == PROTOCOL_VERSION, \
+        "the trace must record which map version produced it"
+    print("  PASS — trace provenance records the register-map version")

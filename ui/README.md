@@ -57,6 +57,37 @@ At the default 10ms scan period that is a 10ms window where the jam
 banner is up and the motor still reads as running. It is one scan of
 observation lag, not a missed stop.
 
+## The twin does not run at a real loom's speed
+
+**The twin completes a shuttle revolution every 1.8–6 seconds — 10 to
+33 rpm depending on the calibration profile. A real 6-shuttle circular
+loom runs at around 200 rpm.**
+
+So the twin is roughly an order of magnitude slow, and it models a
+single position sensor firing once per revolution — it has no
+per-shuttle event at all, where a real loom at 200 rpm passes a shuttle
+about every 50 ms.
+
+This matters if you are using the twin as a bench target and reasoning
+about timing. Control *logic* exercised against it is valid; anything
+that depends on the machine's real rate — poll budgets, sample counts
+per shuttle pass, throughput figures — is not. Do not quote the twin's
+timing as representative of a machine.
+
+| Profile      | speed (u/s) | cycle time | rpm  | sensor pulse |
+| ------------ | ----------- | ---------- | ---- | ------------ |
+| `default`    | 100         | 3.6 s      | 16.7 | 200 ms       |
+| `fast`       | 200         | 1.8 s      | 33.3 | 100 ms       |
+| `slow`       | 80          | 4.5 s      | 13.3 | 250 ms       |
+| shim default | 60          | 6.0 s      | 10.0 | 333 ms       |
+
+Re-speeding it is a deliberate deferral, not an oversight: at 200 rpm
+the cycle is 300 ms and a 20-unit sensor window becomes a **16.7 ms**
+pulse, which forces `scan_period_ms=5` and a rethink of the sensor
+window, and invalidates all three calibration profiles. The full
+derivation is preserved in `docs/backlog.md` so it does not have to be
+reconstructed.
+
 ## Rates
 
 The runtime integrates physics at `sim_step_ms=1` and scans the PLC at
@@ -67,7 +98,8 @@ missed — which real controllers do all the time. See
 `src/shim/twin_runtime.py`.
 
 Real loom PLCs scan at 5–20ms. The previous `step_ms=100` was a
-simulation convenience, never a modelled scan period.
+simulation convenience, never a modelled scan period. The scan period
+is realistic; the machine speed it is scanning (above) is not.
 
 ## State contract
 
