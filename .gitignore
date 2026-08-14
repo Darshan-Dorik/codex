@@ -1,7 +1,76 @@
+# ── Python ────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
+*.pyd
+.Python
+
+# ── Virtual environments ───────────────────────────────────────
 .env
+.env.*
 venv/
 env/
 .venv/
+ENV/
+
+# ── Python packaging ───────────────────────────────────────────
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# ── Testing / coverage ─────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── Jupyter ────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── macOS ──────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ── Editors ────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.sw?
+*.swp
+*~
+
+# ── Project-specific ───────────────────────────────────────────
+# Blender files
+loom-meshed.blend
+loom-meshed.blend1
+
+# Large step/mesh files
+step files/
+step files/meshed-loom.mtl
+
+# Web model — a BUILD ARTEFACT of tools/build_loom_model.py, not a
+# source file. Regenerate it; do not commit it. Even remeshed it is
+# megabytes, and it changes wholesale on every build.
+ui/public/loom.glb
+
+# final_validation.py writes this beside the repo root
+test_report.json
+
+# Generated outputs (keep structure, ignore contents)
+outputs/runs/
+outputs/test_config_bad*.json
+outputs/test_run_log.jsonl
+outputs/final_validation_log.jsonl
+
+# Calibration artefacts (keep committed profiles, ignore generated)
+outputs/calibration_summary.json
+outputs/calibrated_model.json
+
+# ── Node / React (ui/ is a sub-project — covered by ui/.gitignore) ──
+# Root-level node_modules if any
+node_modules/

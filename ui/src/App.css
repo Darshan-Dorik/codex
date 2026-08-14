@@ -1,4 +1,4 @@
-/* ── Reset & base ─────────────────────────────────────────── */
+/* ── Reset ────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -20,36 +20,36 @@ body {
   border: none;
 }
 
-/* ── Dashboard shell ──────────────────────────────────────── */
+/* ── Dashboard shell ─────────────────────────────────────── */
 .dashboard {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 20px 16px 40px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  height: 100vh;
+  overflow: hidden;
 }
 
-/* ── Header ───────────────────────────────────────────────── */
+/* ── Header ──────────────────────────────────────────────── */
 .dash-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #1e293b;
-  padding-bottom: 12px;
+  padding: 10px 20px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+  flex-shrink: 0;
 }
 
 .dash-header h1 {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 600;
   color: #f1f5f9;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
-/* ── Connection badge ─────────────────────────────────────── */
+/* ── Connection badge ────────────────────────────────────── */
 .conn-badge {
   font-size: 12px;
-  padding: 4px 10px;
+  padding: 3px 10px;
   border-radius: 999px;
   font-weight: 500;
 }
@@ -64,21 +64,16 @@ body {
   color: #fca5a5;
 }
 
-.conn-error {
-  font-weight: 400;
-  opacity: 0.8;
-}
-
-/* ── Jam alert ────────────────────────────────────────────── */
+/* ── Jam alert ───────────────────────────────────────────── */
 .jam-alert {
   background: #7f1d1d;
-  border: 1px solid #ef4444;
+  border-bottom: 1px solid #ef4444;
   color: #fecaca;
-  padding: 10px 16px;
-  border-radius: 8px;
+  padding: 8px 20px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   text-align: center;
+  flex-shrink: 0;
   animation: pulse 1s ease-in-out infinite alternate;
 }
 
@@ -92,73 +87,38 @@ body {
   }
 }
 
-/* ── Main grid ────────────────────────────────────────────── */
-.dash-grid {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 16px;
-  align-items: start;
+/* ── 3D Viewport ─────────────────────────────────────────── */
+.viewport {
+  flex: 1;
+  min-height: 0;
+  background: #020617;
 }
 
-@media (max-width: 600px) {
-  .dash-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ── Cards ────────────────────────────────────────────────── */
-.card {
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  padding: 16px;
-}
-
-.card h2 {
-  font-size: 13px;
-  font-weight: 600;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  margin-bottom: 12px;
-}
-
-/* ── Shuttle card ─────────────────────────────────────────── */
-.shuttle-card {
+/* ── Status strip ────────────────────────────────────────── */
+.status-strip {
   display: flex;
-  flex-direction: column;
+  gap: 1px;
+  background: #0f172a;
+  border-top: 1px solid #334155;
+  flex-shrink: 0;
+}
+
+.status-strip .card {
+  flex: 1;
+  background: #1e293b;
+  padding: 12px 16px;
+}
+
+/* ── Motor indicator ─────────────────────────────────────── */
+.motor-indicator {
+  display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.shuttle-card canvas {
-  display: block;
-}
-
-.shuttle-hint {
-  font-size: 11px;
-  color: #64748b;
-  text-align: center;
-}
-
-/* ── Status column ────────────────────────────────────────── */
-.status-col {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* ── Motor indicator ──────────────────────────────────────── */
-.motor-indicator {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-}
-
 .motor-dot {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
   transition: background 0.3s;
@@ -166,18 +126,17 @@ body {
 
 .motor-indicator.running .motor-dot {
   background: #22c55e;
-  box-shadow: 0 0 8px #22c55e;
+  box-shadow: 0 0 6px #22c55e;
 }
 
 .motor-indicator.stopped .motor-dot {
   background: #ef4444;
-  box-shadow: 0 0 8px #ef4444;
+  box-shadow: 0 0 6px #ef4444;
 }
 
 .motor-label {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.5px;
 }
 
 .motor-indicator.running .motor-label {
@@ -188,31 +147,26 @@ body {
   color: #fca5a5;
 }
 
-/* ── Sensor panel ─────────────────────────────────────────── */
+/* ── Sensor panel ────────────────────────────────────────── */
 .sensor-panel h3 {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
-  color: #94a3b8;
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .sensor-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 5px 0;
-  border-bottom: 1px solid #0f172a;
-}
-
-.sensor-row:last-child {
-  border-bottom: none;
+  gap: 8px;
+  padding: 3px 0;
 }
 
 .sensor-light {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
   transition: background 0.2s, box-shadow 0.2s;
@@ -220,7 +174,7 @@ body {
 
 .sensor-light.on {
   background: #22c55e;
-  box-shadow: 0 0 6px #22c55e;
+  box-shadow: 0 0 5px #22c55e;
 }
 
 .sensor-light.off {
@@ -229,16 +183,16 @@ body {
 
 .sensor-name {
   flex: 1;
-  font-size: 13px;
-  color: #cbd5e1;
+  font-size: 12px;
+  color: #94a3b8;
 }
 
 .sensor-value {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   font-family: monospace;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 1px 5px;
+  border-radius: 3px;
 }
 
 .sensor-value.on {
@@ -247,61 +201,33 @@ body {
 }
 
 .sensor-value.off {
-  background: #1e293b;
+  background: #0f172a;
   color: #475569;
 }
 
-/* ── Timeline ─────────────────────────────────────────────── */
+/* ── Timeline ────────────────────────────────────────────── */
 .timeline {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
 }
 
 .timeline-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  flex-shrink: 0;
 }
 
 .timeline-value {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   font-family: monospace;
   color: #f1f5f9;
-  letter-spacing: 1px;
 }
 
 .timeline-ms {
   font-size: 11px;
   color: #475569;
   font-family: monospace;
-}
-
-/* ── Raw state debug ──────────────────────────────────────── */
-.raw-state {
-  margin-top: 8px;
-}
-
-.raw-state summary {
-  font-size: 12px;
-  color: #475569;
-  cursor: pointer;
-  user-select: none;
-  padding: 4px 0;
-}
-
-.raw-state pre {
-  margin-top: 8px;
-  background: #0f172a;
-  border: 1px solid #1e293b;
-  border-radius: 6px;
-  padding: 12px;
-  font-size: 12px;
-  color: #64748b;
-  font-family: monospace;
-  overflow-x: auto;
-  text-align: left;
 }
