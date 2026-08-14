@@ -58,6 +58,10 @@ step files/meshed-loom.mtl
 # megabytes, and it changes wholesale on every build.
 ui/public/loom.glb
 
+# tools/build_loom_model.py --render writes this; a developer check, not
+# an asset, which is why it does not live under ui/public
+voxel_check.png
+
 # final_validation.py writes this beside the repo root
 test_report.json
 

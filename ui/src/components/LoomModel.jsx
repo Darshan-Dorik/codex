@@ -1,8 +1,27 @@
 /**
  * LoomModel.jsx — the real machine
  *
- * Loads the decimated CAD export (public/loom.glb) produced from
- * loom-meshed.blend by tools/blender_decimate.py.
+ * Loads the voxel-remeshed CAD export (public/loom.glb) produced from
+ * loom-meshed.blend by tools/build_loom_model.py.
+ *
+ * THIS MESH IS A VISUAL SHELL. IT CARRIES NO SIMULATION STATE.
+ *
+ * Nothing here is kinematic and nothing here is authoritative. The
+ * geometry has been voxel-remeshed — rebuilt from a distance field at
+ * 3-12 mm depending on the part — so its surfaces are an approximation
+ * of the CAD, not the CAD, and there is no correspondence between a
+ * vertex here and anything the twin models. The machine's moving parts
+ * are not even separate objects in this file.
+ *
+ * The six shuttles are NOT in this mesh. The CAD contains no shuttle
+ * geometry at all. They are synthesised in Shuttles.jsx and driven from
+ * `shuttle_position`, which comes from the twin's CyclicShuttleModel via
+ * the /state endpoint.
+ *
+ * So: do not derive positions, angles, collisions or sensor triggers
+ * from this mesh. The twin is the source of truth for all of that, and
+ * anything read off this geometry would be reading an artefact of the
+ * remesh settings in tools/build_loom_model.py.
  *
  * WHY THE FITTING HAPPENS HERE
  * The source CAD is in millimetres and spans ~4.3 m, positioned
@@ -20,6 +39,13 @@ import { useGLTF } from '@react-three/drei'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 
+// The reed assembly keeps its CAD name through the glTF export, which is
+// what makes it findable here. Renaming it in the source CAD, or
+// filtering it out of the build, breaks shuttle placement — so if this
+// ever stops matching, Scene.jsx hides the shuttles rather than drawing
+// them somewhere wrong.
+const REED_NODE = /FLAT STEEL REED WITH CAM/i
+
 export default function LoomModel({
     url = '/loom.glb',
     fit = 6,
@@ -33,15 +59,33 @@ export default function LoomModel({
     // clone so hot-reload and multiple mounts don't mutate the cache
     const model = useMemo(() => scene.clone(true), [scene])
 
-    const material = useMemo(
-        () =>
-            new THREE.MeshStandardMaterial({
-                color: '#8d97a6',
-                metalness: 0.82,
-                roughness: 0.34,
-            }),
-        [],
-    )
+    // Jam tints the whole machine; stopped desaturates it. Cheap, and
+    // readable from across a room, which is what a plant dashboard is
+    // for.
+    //
+    // The tint is applied INSIDE the memo factory rather than by writing
+    // to the material afterwards: mutating an object React is holding is
+    // rejected by react-hooks/immutability, and it would not re-render.
+    const material = useMemo(() => {
+        const m = new THREE.MeshStandardMaterial({
+            metalness: 0.82,
+            roughness: 0.34,
+        })
+        if (jam) {
+            m.color.set('#b06a6a')
+            m.emissive.set('#3b0d0d')
+            m.emissiveIntensity = 0.55
+        } else if (!running) {
+            m.color.set('#6f7887')
+            m.emissive.set('#000000')
+            m.emissiveIntensity = 0
+        } else {
+            m.color.set('#8d97a6')
+            m.emissive.set('#0b1622')
+            m.emissiveIntensity = 0.18
+        }
+        return m
+    }, [jam, running])
 
     useLayoutEffect(() => {
         const box = new THREE.Box3().setFromObject(model)
@@ -59,6 +103,7 @@ export default function LoomModel({
 
         let meshes = 0
         let tris = 0
+        let reed = null
         model.traverse((o) => {
             if (!o.isMesh) return
             meshes += 1
@@ -67,35 +112,59 @@ export default function LoomModel({
             else if (g?.attributes?.position) tris += g.attributes.position.count / 3
             o.castShadow = true
             o.receiveShadow = true
-            o.material = material
+            if (REED_NODE.test(o.name)) reed = o
         })
+
+        // WHERE THE SHUTTLES GO.
+        //
+        // The shuttle ring cannot use a hardcoded radius. This model is
+        // the whole machine — 4.3 m from creel end to winder — and the
+        // loom head is a ~1.2 m ring sitting off-centre within that, so
+        // any fixed number puts the shuttles in mid-air beside the
+        // machine. Measure the reed instead: it IS the shuttle track,
+        // and it survives into the GLB under its CAD name.
+        //
+        // Falls back to null rather than to a guess. Scene.jsx hides
+        // the shuttles when there is no anchor, which is honest — a
+        // wrong position would misreport where the twin thinks the
+        // shuttles are.
+        let anchor = null
+        if (reed) {
+            model.updateMatrixWorld(true)
+            const rb = new THREE.Box3().setFromObject(reed)
+            const rc = new THREE.Vector3()
+            const rs = new THREE.Vector3()
+            rb.getCenter(rc)
+            rb.getSize(rs)
+            anchor = {
+                x: rc.x,
+                y: rc.y,
+                z: rc.z,
+                // Ring lies in XZ with Y as its axis (the export is
+                // Y-up; see tools/build_loom_model.py on export_yup).
+                radius: Math.max(rs.x, rs.z) / 2,
+            }
+        }
 
         onFitted?.({
             meshes,
             tris: Math.round(tris),
             spanMm: Math.round(span),
             scale: s,
+            anchor,
         })
-    }, [model, fit, material, onFitted])
+        // Deliberately NOT dependent on `material`. Measurement must run
+        // once per model: if a jam re-ran it, onFitted would hand Scene a
+        // fresh anchor object, OrbitControls would see a new target and
+        // yank the camera every time the machine faulted.
+    }, [model, fit, onFitted])
 
-    // Jam tints the whole machine; stopped desaturates it. Cheap, and
-    // readable from across a room, which is what a plant dashboard is for.
+    // Shading is separate from measurement for that reason.
     useLayoutEffect(() => {
-        if (jam) {
-            material.color.set('#b06a6a')
-            material.emissive.set('#3b0d0d')
-            material.emissiveIntensity = 0.55
-        } else if (!running) {
-            material.color.set('#6f7887')
-            material.emissive.set('#000000')
-            material.emissiveIntensity = 0
-        } else {
-            material.color.set('#8d97a6')
-            material.emissive.set('#0b1622')
-            material.emissiveIntensity = 0.18
-        }
-        material.needsUpdate = true
-    }, [jam, running, material])
+        model.traverse((o) => {
+            if (o.isMesh) o.material = material
+        })
+    }, [model, material])
 
     return <primitive ref={group} object={model} />
 }

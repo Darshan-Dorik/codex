@@ -26,30 +26,34 @@ const SHUTTLE_COUNT = 6
 
 export default function Shuttles({
     positionDeg = 0,
-    radius = 1.55,
-    height = 1.02,
+    // Measured from the reed in LoomModel.jsx, not chosen. See the note
+    // there: the model is the whole 4.3 m machine and the loom head sits
+    // off-centre inside it, so a literal radius puts the shuttles beside
+    // the machine rather than on its track.
+    anchor,
     running = true,
     jam = false,
 }) {
     const group = useRef()
     const target = useRef(0)
 
+    const radius = anchor.radius
+    // Shuttle size follows the track, so the markers stay proportionate
+    // whatever `fit` the model was scaled to.
+    const bodyR = radius * 0.036
+    const bodyL = radius * 0.11
+
     const bodies = useMemo(
         () => Array.from({ length: SHUTTLE_COUNT }, (_, i) => i),
         [],
     )
 
-    const material = useMemo(
-        () =>
-            new THREE.MeshStandardMaterial({
-                color: '#f59e0b',
-                metalness: 0.35,
-                roughness: 0.3,
-                emissive: '#7c3d00',
-                emissiveIntensity: 0.7,
-            }),
-        [],
-    )
+    // Declared, not mutated. Building a THREE material in a useMemo and
+    // then writing to it during render mutates a value React is holding
+    // — react-hooks/immutability rejects it, and it would also skip the
+    // re-render that is supposed to show the state change.
+    const colour = jam ? '#ef4444' : running ? '#f59e0b' : '#64748b'
+    const glow = jam ? 1.1 : running ? 0.7 : 0.15
 
     // The twin reports absolute position, so drive rotation from the
     // value rather than integrating locally — a dropped frame then
@@ -65,11 +69,8 @@ export default function Shuttles({
         group.current.rotation.y = cur + delta * Math.min(1, dt * 12)
     })
 
-    material.color.set(jam ? '#ef4444' : running ? '#f59e0b' : '#64748b')
-    material.emissiveIntensity = jam ? 1.1 : running ? 0.7 : 0.15
-
     return (
-        <group ref={group} position={[0, height, 0]}>
+        <group ref={group} position={[anchor.x, anchor.y, anchor.z]}>
             {bodies.map((i) => {
                 const a = (i / SHUTTLE_COUNT) * Math.PI * 2
                 return (
@@ -78,11 +79,18 @@ export default function Shuttles({
                         position={[Math.cos(a) * radius, 0, Math.sin(a) * radius]}
                         rotation={[0, -a, 0]}
                     >
-                        <mesh castShadow material={material}>
-                            <capsuleGeometry args={[0.055, 0.17, 4, 12]} />
+                        <mesh castShadow>
+                            <capsuleGeometry args={[bodyR, bodyL, 4, 12]} />
+                            <meshStandardMaterial
+                                color={colour}
+                                metalness={0.35}
+                                roughness={0.3}
+                                emissive="#7c3d00"
+                                emissiveIntensity={glow}
+                            />
                         </mesh>
                         <pointLight
-                            distance={0.9}
+                            distance={radius * 0.6}
                             intensity={jam ? 2.2 : running ? 1.1 : 0.2}
                             color={jam ? '#ef4444' : '#f59e0b'}
                         />

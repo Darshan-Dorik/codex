@@ -13,6 +13,43 @@ the runtime owns the only mutable state and hands out immutable
 snapshots, so the dashboard, the Modbus shim and anything else read the
 same PLC scan.
 
+## The machine model
+
+The 3D machine is the real CAD, reduced to `ui/public/loom.glb` by
+`tools/build_loom_model.py`. The GLB is a **build artefact** and is
+gitignored — a fresh clone has no model, and the scene falls back to a
+primitive frame rather than showing an empty canvas. To build it you need
+Blender and `loom-meshed.blend`:
+
+```bash
+/Applications/Blender.app/Contents/MacOS/Blender \
+    loom-meshed.blend --background --python tools/build_loom_model.py
+# 53 M polys -> 580 k, 6.0 MB, ~7 s
+
+... --python tools/build_loom_model.py -- --include-creel   # whole machine
+... --python tools/build_loom_model.py -- --render          # geometry check
+```
+
+Nothing else in the repo needs Blender, and the engine never imports this
+script — the stdlib-only rule is unaffected.
+
+**The mesh is a visual shell and carries no simulation state.** It is
+voxel-remeshed at 3–12 mm depending on the part, so its surfaces
+approximate the CAD rather than being it, and none of its parts move. Do
+not derive positions, angles or sensor triggers from it; the twin is the
+source of truth for all of that.
+
+**There are no shuttles in the CAD.** All 117 assemblies were checked —
+creel, compensators, reeds, loom bed, take-up, winders — and not one is a
+shuttle or bobbin. The six shuttles are synthesised in `Shuttles.jsx` and
+driven from `shuttle_position`, i.e. from the twin's `CyclicShuttleModel`.
+They are placed by measuring the reed assembly in the loaded GLB, not by
+a hardcoded radius: the model spans the whole 5.7 m machine and the loom
+head is a ~0.6-unit ring off-centre within it, so a fixed radius puts the
+shuttles beside the machine instead of on its track. If the reed node
+cannot be found, the shuttles are hidden rather than drawn somewhere
+wrong.
+
 ## Two behaviours that look like bugs and are not
 
 The twin used to run **open-loop**: `api_server.py` commanded the motor

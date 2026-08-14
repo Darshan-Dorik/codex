@@ -12,9 +12,9 @@
  *     python3 tools/build_loom_model.py
  */
 
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, Grid, ContactShadows, Html } from '@react-three/drei'
-import { Component, Suspense, useState } from 'react'
+import { Component, Suspense, useEffect, useMemo, useState } from 'react'
 
 import LoomModel from './components/LoomModel'
 import Shuttles from './components/Shuttles'
@@ -31,13 +31,40 @@ class ModelBoundary extends Component {
         return { failed: true }
     }
     componentDidCatch(err) {
-        // eslint-disable-next-line no-console
         console.warn('[Scene] loom.glb unavailable, using primitive frame:', err?.message)
         this.props.onFail?.()
     }
     render() {
         return this.state.failed ? this.props.fallback : this.props.children
     }
+}
+
+/**
+ * Pulls the camera in to frame the loom head once it has been measured.
+ *
+ * The Canvas camera prop is initial-only, and a fixed position cannot be
+ * right here: the model is the whole 5.7 m machine but the loom head is
+ * a ~0.63-unit ring within it, so a camera framed on the machine renders
+ * the part the twin actually simulates about the size of a coin. Framing
+ * off the anchor keeps the loom head the subject no matter how the
+ * export's extents change.
+ */
+function FrameOnAnchor({ anchor }) {
+    const { camera } = useThree()
+    useEffect(() => {
+        if (!anchor) return
+        const d = anchor.radius * 6
+        // Position only. The Canvas camera's default near/far already
+        // bracket a scene fitted to 6 units, and assigning to `camera`
+        // itself is a hook value mutation that react-hooks/immutability
+        // rejects — writing through camera.position is not.
+        camera.position.set(
+            anchor.x + d * 0.80,
+            anchor.y + d * 0.55,
+            anchor.z + d * 0.95,
+        )
+    }, [anchor, camera])
+    return null
 }
 
 function Loading() {
@@ -61,6 +88,12 @@ export default function Scene({ state = {} }) {
     const jam = !!state.jam_detected
     const running = !!state.motor_running
     const pos = state.shuttle_position ?? 0
+
+    const a = info?.anchor
+    const orbitTarget = useMemo(
+        () => (a ? [a.x, a.y, a.z] : [0, 1.6, 0]),
+        [a],
+    )
 
     return (
         <Canvas
@@ -106,8 +139,19 @@ export default function Scene({ state = {} }) {
                 </ModelBoundary>
             </Suspense>
 
-            {usingCad && (
-                <Shuttles positionDeg={pos} running={running} jam={jam} />
+            <FrameOnAnchor anchor={info?.anchor} />
+
+            {/* Only once LoomModel has measured the reed. Without an
+                anchor the shuttles have no track to sit on, and drawing
+                them at a guessed radius would put them beside the
+                machine while implying they are on it. */}
+            {usingCad && info?.anchor && (
+                <Shuttles
+                    positionDeg={pos}
+                    anchor={info.anchor}
+                    running={running}
+                    jam={jam}
+                />
             )}
 
             <ContactShadows
@@ -128,13 +172,17 @@ export default function Scene({ state = {} }) {
                 infiniteGrid
             />
 
+            {/* Orbit about the loom head, not the scene origin. The
+                model spans the whole 4.3 m machine, so its centre sits
+                well off the loom and the default target framed mostly
+                empty floor. */}
             <OrbitControls
                 enablePan
                 enableZoom
                 enableRotate
-                minDistance={3}
+                minDistance={1.5}
                 maxDistance={40}
-                target={[0, 1.6, 0]}
+                target={orbitTarget}
                 maxPolarAngle={Math.PI / 2.05}
             />
 
