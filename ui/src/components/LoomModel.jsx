@@ -44,7 +44,17 @@ import * as THREE from 'three'
 // filtering it out of the build, breaks shuttle placement — so if this
 // ever stops matching, Scene.jsx hides the shuttles rather than drawing
 // them somewhere wrong.
-const REED_NODE = /FLAT STEEL REED WITH CAM/i
+//
+// MATCH ON A NORMALISED NAME, NOT THE RAW ONE. GLTFLoader passes every
+// node name through PropertyBinding.sanitizeNodeName, which turns
+// whitespace into underscores and strips []./: — so the CAD's
+// "705 _ 001 FLAT STEEL REED WITH CAM ASSY (Meshed)" arrives as
+// "705___001_FLAT_STEEL_REED_WITH_CAM_ASSY_(Meshed)". A regex written
+// against the name as it appears in Blender silently never matches, and
+// the failure is quiet: no reed, no anchor, shuttles hidden.
+const REED_NODE = 'FLAT STEEL REED WITH CAM'
+const normaliseName = (s) =>
+    (s || '').replace(/[^A-Za-z0-9]+/g, ' ').trim().toUpperCase()
 
 export default function LoomModel({
     url = '/loom.glb',
@@ -66,23 +76,23 @@ export default function LoomModel({
     // The tint is applied INSIDE the memo factory rather than by writing
     // to the material afterwards: mutating an object React is holding is
     // rejected by react-hooks/immutability, and it would not re-render.
+    // metalness 0.55, not 0.82. A near-pure metal takes almost all its
+    // colour from reflections, so against a light background it needs a
+    // strong environment or it renders as a dark silhouette. Backing off
+    // the metalness keeps the diffuse colour doing real work, and the
+    // Environment in Scene.jsx supplies the rest.
     const material = useMemo(() => {
         const m = new THREE.MeshStandardMaterial({
-            metalness: 0.82,
-            roughness: 0.34,
+            metalness: 0.55,
+            roughness: 0.42,
+            envMapIntensity: 1.0,
         })
         if (jam) {
-            m.color.set('#b06a6a')
-            m.emissive.set('#3b0d0d')
-            m.emissiveIntensity = 0.55
+            m.color.set('#b8564a')
         } else if (!running) {
-            m.color.set('#6f7887')
-            m.emissive.set('#000000')
-            m.emissiveIntensity = 0
+            m.color.set('#a9b1ae')
         } else {
-            m.color.set('#8d97a6')
-            m.emissive.set('#0b1622')
-            m.emissiveIntensity = 0.18
+            m.color.set('#8b9491')
         }
         return m
     }, [jam, running])
@@ -112,7 +122,7 @@ export default function LoomModel({
             else if (g?.attributes?.position) tris += g.attributes.position.count / 3
             o.castShadow = true
             o.receiveShadow = true
-            if (REED_NODE.test(o.name)) reed = o
+            if (normaliseName(o.name).includes(REED_NODE)) reed = o
         })
 
         // WHERE THE SHUTTLES GO.

@@ -13,6 +13,24 @@ the runtime owns the only mutable state and hands out immutable
 snapshots, so the dashboard, the Modbus shim and anything else read the
 same PLC scan.
 
+## Theme
+
+Light, deliberately. This is read on a plant floor under high ambient
+light, where a dark panel behaves like a mirror. The palette comes from
+the machine's own materials — mill concrete, galvanised steel, the
+machine-green of the enamel, the burnt amber of the shuttles — and lives
+as custom properties at the top of `src/App.css`.
+
+**No webfonts.** The deployment target has no route to a font CDN, and a
+stylesheet that blocks on one shows the operator an empty panel. Type
+personality comes from instrument vernacular instead: large tabular
+monospace readouts against small wide-tracked uppercase labels.
+
+The 3D scene carries its own lighting environment built from
+`<Lightformer>`s rather than an HDR file, for the same offline reason.
+It is not decoration — the machine material is metallic, and a metal with
+nothing to reflect renders black.
+
 ## The machine model
 
 The 3D machine is the real CAD, reduced to `ui/public/loom.glb` by

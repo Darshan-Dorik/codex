@@ -52,8 +52,11 @@ export default function Shuttles({
     // then writing to it during render mutates a value React is holding
     // — react-hooks/immutability rejects it, and it would also skip the
     // re-render that is supposed to show the state change.
-    const colour = jam ? '#ef4444' : running ? '#f59e0b' : '#64748b'
-    const glow = jam ? 1.1 : running ? 0.7 : 0.15
+    const colour = jam ? '#b0301f' : running ? '#c86a16' : '#8a9694'
+    // Emissive is held low against a light background: on a bright
+    // ground a glowing marker washes out to a pale blob, and the
+    // shuttles need to stay legible as objects on the reed.
+    const glow = jam ? 0.55 : running ? 0.25 : 0
 
     // The twin reports absolute position, so drive rotation from the
     // value rather than integrating locally — a dropped frame then
@@ -85,15 +88,20 @@ export default function Shuttles({
                                 color={colour}
                                 metalness={0.35}
                                 roughness={0.3}
-                                emissive="#7c3d00"
+                                emissive={jam ? '#5e1509' : '#6b3405'}
                                 emissiveIntensity={glow}
                             />
                         </mesh>
-                        <pointLight
-                            distance={radius * 0.6}
-                            intensity={jam ? 2.2 : running ? 1.1 : 0.2}
-                            color={jam ? '#ef4444' : '#f59e0b'}
-                        />
+                        {/* Only when faulted. Six point lights on a
+                            bright scene flatten it and buy nothing; on a
+                            jam the extra pool of red is the point. */}
+                        {jam && (
+                            <pointLight
+                                distance={radius * 0.7}
+                                intensity={1.6}
+                                color="#b0301f"
+                            />
+                        )}
                     </group>
                 )
             })}
